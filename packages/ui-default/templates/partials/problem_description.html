@@ -25,7 +25,6 @@
     </blockquote>
     {% endif %}
   {% endif %}
-  {% include "partials/fileio_hint.html" %}
   {% if not renderredContent %}
     {% set preferredLang = handler.request.query.lang or handler.user.viewLang or handler.session.viewLang %}
     {% set renderredContent = pdoc.content|content(preferredLang, pdoc.html) %}

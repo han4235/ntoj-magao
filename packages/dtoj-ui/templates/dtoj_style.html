@@ -2197,47 +2197,6 @@
     .dtoj-problem-sub .dtoj-problem-layout { grid-template-columns: 1fr; }
     .dtoj-problem-sub .dtoj-problem-main { padding: 18px 16px 22px; }
   }
-  /* 文件输入输出的提示条，标记见 partials/fileio_hint.html。
-     题目页与提交页共用，所以挂在这里而不是某一页的局部样式里。 */
-  .dtoj-fileio {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--s3);
-    margin: 0 0 var(--s4);
-    padding: var(--s3) var(--s4);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    border-radius: 12px;
-    background: var(--wash);
-  }
-  .dtoj-fileio__tag {
-    flex: 0 0 auto;
-    padding: 1px 10px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 22px;
-    white-space: nowrap;
-  }
-  .dtoj-fileio__body { min-width: 0; font-size: 13px; line-height: 1.75; color: var(--ink-2); }
-  .dtoj-fileio__body p { margin: 0; }
-  .dtoj-fileio__body code { color: var(--note-ink); }
-  .dtoj-fileio__body pre {
-    margin: var(--s2) 0 0;
-    padding: var(--s2) var(--s3);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #fff;
-    font-size: 12.5px;
-    line-height: 1.7;
-    overflow-x: auto;
-  }
-  .dtoj-fileio__body pre code { color: inherit; }
-  @media (max-width: 640px) {
-    .dtoj-fileio { flex-direction: column; gap: var(--s2); }
-  }
 </style>
 <button type="button" class="dtoj-scroll-top" id="dtoj-scroll-top" hidden aria-label="返回页面顶部">
   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5 3.5 8h3v4.5h3V8h3L8 3.5z" fill="currentColor"/></svg>

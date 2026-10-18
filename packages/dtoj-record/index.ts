@@ -177,6 +177,13 @@ class DtojRecordDetailHandler extends RecordDetailHandler {
         const psdoc = body.pdoc
             ? await ProblemModel.getStatus(domainId, body.pdoc.docId, this.user._id)
             : null;
+        // 侧栏「所属题目」要能点得开。带 tid 的题目链接会过「参加/认领」这道门槛：
+        // 没认领的人（老师查学生记录时就是这样）点进去只会看到「尚未参加比赛」。
+        // 题目本身在题库看得到时就去掉 tid 直连题库页，不绕作业/比赛。
+        const contextOk = !!body.tdoc
+            && (!!this.tsdoc?.attend || contest.isDone(body.tdoc, this.tsdoc));
+        body.problemLinkNoTid = !contextOk
+            && !!body.pdoc && ProblemModel.canViewBy(body.pdoc, this.user);
         const allowCode = canViewRecordSourceCode(this.user, this.rdoc, psdoc, isOwnOrTeammate);
         if (!allowCode) {
             body.rdoc = { ...body.rdoc, code: '', files: {}, compilerTexts: [] };

@@ -81,7 +81,7 @@
           <dl class="dtoj-record-meta">
             {% if pdoc %}
             <dt>所属题目</dt>
-            <dd>{{ problem.render_problem_title(pdoc, tdoc, show_tags=false, show_invisible_flag=false) }}</dd>
+            <dd>{% set _linkTdoc = none if problemLinkNoTid else tdoc %}{{ problem.render_problem_title(pdoc, _linkTdoc, show_tags=false, show_invisible_flag=false) }}</dd>
             {% endif %}
             <dt>评测状态</dt>
             <dd><span class="dtoj-record-verdict {{ statusTone }}">{{ statusKey }}</span></dd>

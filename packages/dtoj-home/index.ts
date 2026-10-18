@@ -346,6 +346,7 @@ class DtojProblemHandler extends DtojDataHandler {
             pid: String(pdoc.pid || pdoc.docId),
             link: pdoc.pid || pdoc.docId,
             docId: pdoc.docId,
+            hidden: !!pdoc.hidden,
             tags: pdoc.tag || [],
             level: problemLevel(pdoc),
             diff: Number.isInteger(Number(pdoc.difficulty)) ? Number(pdoc.difficulty) : 0,

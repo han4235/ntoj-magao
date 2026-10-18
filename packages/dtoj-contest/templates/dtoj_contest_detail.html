@@ -189,7 +189,7 @@
           <i aria-hidden="true">:</i>
           <b data-s>00</b><span>秒</span>
         </div>
-        <p class="dtoj-race-meta"><b>{{ contest.rule }}</b> · 题目 {{ contest.problems }} · 持续时间 {{ contest.hours }} 小时{% if contest.personal %} · 个人作答 {{ contest.personalHours }} 小时{% endif %}</p>
+        <p class="dtoj-race-meta"><b>{{ contest.rule }}</b> · 题目 {{ contest.problems }} · 开放窗口 {{ contest.hours }} 小时{% if contest.personal %} · 个人作答 {{ contest.personalHours }} 小时{% endif %}</p>
         <p class="dtoj-race-when">开始于 <b>{% if contest.beginAt %}{{ datetimeSpan(contest.beginAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %}</b> · 结束于 <b>{% if contest.endAt %}{{ datetimeSpan(contest.endAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %}</b></p>
       </article>
       <div class="dtoj-race-layout">

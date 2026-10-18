@@ -707,7 +707,7 @@ class DtojContestEditHandler extends DtojDataHandler {
             return;
         }
         if (!Number.isFinite(hours) || hours <= 0) {
-            this.form(domainId, { ...draft, error: '时长要写大于 0 的小时数。' });
+            this.form(domainId, { ...draft, error: '开放窗口要写大于 0 的小时数。' });
             return;
         }
         const found = await problemsOf(domainId, pids);
@@ -719,7 +719,7 @@ class DtojContestEditHandler extends DtojDataHandler {
         const endAt = begin.clone().add(hours, 'hours').toDate();
         const personal = personalHours.trim() ? Number(personalHours) : 0;
         if (!Number.isFinite(personal) || personal < 0) {
-            this.form(domainId, { ...draft, error: '个人作答时长要写成不小于 0 的小时数，留空表示和开放时长相同。' });
+            this.form(domainId, { ...draft, error: '个人作答时长要写成不小于 0 的小时数，留空表示和开放窗口相同。' });
             return;
         }
         const nextAllowPause = allowPause === '1' || allowPause === 'on';

@@ -9,6 +9,7 @@ import {
     notifyHomeworkAttended, notifyHomeworkCompleted, replyHomeworkQuestion,
 } from './homeworkQA';
 import { applyInboxNotices } from './inboxNotices';
+import { notifyGroupSubmission } from './groupActivity';
 import {
     assignSignature, homeworkMergeGroups, mergeAssignLabel, mergedPids, mergedWindow, pickMergeTarget,
 } from './homeworkMerge';
@@ -1145,6 +1146,12 @@ export async function apply(ctx: Context) {
         await bridgeInboxReply(
             that.user._id, +args.uid, String(args.content), that.request.ip,
         );
+    });
+
+    // 组员动态：小组里的学生交完题，给组的创建者发站内消息。
+    // 频次（每位老师每天每位学生一条）与文案见 groupActivity.ts。
+    ctx.on('record/judge', async (rdoc, _updated, pdoc, callback: any) => {
+        await notifyGroupSubmission(rdoc.domainId, rdoc, pdoc, !!callback?.meta?.rejudge);
     });
 
     // 作业答疑的两条写入口，见 DtojHomeworkAskHandler / DtojHomeworkReplyHandler

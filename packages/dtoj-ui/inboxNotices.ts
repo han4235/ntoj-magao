@@ -5,7 +5,7 @@ import {
 /**
  * 站内消息里「通知类」正文的显示处理。
  *
- * 学生提问、认领作业、交完作业这些消息以当事人的身份发出，正文存成 i18n 的 JSON
+ * 学生提问、认领作业、交完作业、小组动态这些消息以当事人的身份发出，正文存成 i18n 的 JSON
  * （{ message, params, url }），本意是让前端按各自的界面语言翻出来。但 ui-default
  * 只在「发件人是系统账号」时才解析它 —— MessagePadDialogueContentContainer 的
  * renderContent 里写的是 `if (msg.from === 1)`。发件人换成学生之后，会话列表的摘要

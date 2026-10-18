@@ -914,7 +914,7 @@
       {% if handler.args.trid %}
       <p class="dtoj-problem-back" id="dtoj-problem-back-links"><a href="{{ url('training_main') }}" data-dtoj-back-fallback="{{ url('training_main') }}" data-dtoj-training-home>返回训练</a></p>
       {% else %}
-      <p class="dtoj-problem-back" id="dtoj-problem-back-links"><a href="{{ url('dtoj_problems') }}" data-dtoj-back-fallback="{{ url('dtoj_problems') }}">返回题库</a></p>
+      <p class="dtoj-problem-back" id="dtoj-problem-back-links"><a href="{{ url('dtoj_problems') }}" data-dtoj-back-fallback="{{ url('dtoj_problems') }}" data-dtoj-back-same="{{ url('dtoj_problems') }}">返回题库</a></p>
       {% endif %}
       {% endif %}
       <div class="dtoj-problem-layout">

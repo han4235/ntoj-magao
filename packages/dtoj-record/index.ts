@@ -14,7 +14,7 @@ import {
     canViewRecordSourceCode,
 } from './recordAccess';
 import { DtojDataHandler, dropEarlierRoutes, queryString } from 'dtoj-ui';
-import { buildCaseFileUrlMap, buildDtojRecordDetailView, canViewProblemTestdataFiles } from './dtojRecordDetail';
+import { buildCaseFileUrlMap, buildCaseLabelMap, buildDtojRecordDetailView, canViewProblemTestdataFiles } from './dtojRecordDetail';
 
 function memoryText(kb: number) {
     let s = kb * 1024;
@@ -230,6 +230,7 @@ class DtojRecordDetailConnectionHandler extends RecordDetailConnectionHandler {
                 rdoc,
                 pdoc: this.pdoc,
                 caseFiles: buildCaseFileUrlMap(this as any, this.pdoc, rdoc),
+                caseLabels: buildCaseLabelMap(rdoc.testCases || []),
                 canViewCaseFiles: canViewProblemTestdataFiles(this as any, this.pdoc),
             }),
             summary_html: await this.renderHTML('dtoj_record_detail_summary.html', { rdoc, pdoc: this.pdoc }),

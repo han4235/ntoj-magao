@@ -106,6 +106,39 @@ function buildCaseIndexMap(
     return map;
 }
 
+/** 测试点卡片的编号。
+ *
+ *  两种数据并存：多数题的子任务号从 0 起（转换器生成的），客观题却直接拿题号当子任务号，
+ *  从 1 起、组内序号固定是 0。所以先看有没有 0 号子任务：有就按 0 起、统一加 1 显示。
+ *  （子任务号原样显示的只有核心的 record_detail_status.html，那边 0 起的题会显示 #0。）
+ *
+ *  多子任务时编号是 `子任务-组内序号`，但组里只有一个点就只写子任务号 —— 客观题每题一个
+ *  子任务，否则会出现「#2-0」这种其实只有一个点的编号。只有一个子任务的普通题不显示子任务号，
+ *  就是测试点本身的序号，与改动前一致。
+ */
+export function buildCaseLabelMap(testCases: { id?: number; subtaskId?: number }[]) {
+    const groups = new Map<number, { id?: number }[]>();
+    for (const tc of testCases) {
+        const sid = tc.subtaskId ?? 0;
+        const list = groups.get(sid);
+        if (list) list.push(tc);
+        else groups.set(sid, [tc]);
+    }
+    const multiGroup = groups.size > 1;
+    const offset = groups.has(0) ? 1 : 0;
+    const labels: Record<string, string> = {};
+    for (const [sid, list] of groups) {
+        const sorted = list.slice().sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+        sorted.forEach((tc, i) => {
+            const cid = tc.id || i + 1;
+            let num = String(cid);
+            if (multiGroup) num = sorted.length > 1 ? `${sid + offset}-${cid}` : String(sid + offset);
+            labels[`${sid}:${tc.id ?? 0}`] = num;
+        });
+    }
+    return labels;
+}
+
 /** 某个测试点对应的输入/输出文件名，附带文件大小。
  *  大小交给前端判断「能不能在页面内预览」，大了就直接给下载。 */
 function caseFilenames(
@@ -191,9 +224,9 @@ export function buildDtojRecordDetailView(
         }));
     const canReadData = canViewProblemTestdataFiles(handler, pdoc);
     const caseFiles = buildCaseFileUrlMap(handler, pdoc, rdoc);
-    // 下载列表的编号跟卡片保持一致：多子任务时形如 10-3，否则就是 3
+    // 下载列表的编号跟卡片保持一致，见 buildCaseLabelMap
     const indexMap = buildCaseIndexMap(rdoc.testCases || []);
-    const multiGroup = new Set((rdoc.testCases || []).map((tc) => tc.subtaskId ?? 0)).size > 1;
+    const caseLabels = buildCaseLabelMap(rdoc.testCases || []);
     const downloads: { num: string; url: string }[] = [];
     if (canReadData && pdoc) {
         for (const tc of rdoc.testCases || []) {
@@ -202,7 +235,7 @@ export function buildDtojRecordDetailView(
             const filename = caseFilenames(pdoc, indexMap, tc).input || findTestdataFile(pdoc, caseNo);
             if (!filename) continue;
             downloads.push({
-                num: multiGroup ? `${(tc.subtaskId ?? 0) + 1}-${tc.id ?? 0}` : String(tc.id ?? 0),
+                num: caseLabels[`${tc.subtaskId ?? 0}:${tc.id ?? 0}`] ?? String(tc.id ?? 0),
                 url: handler.url('problem_file_download', {
                     pid: pdoc.docId,
                     filename,
@@ -224,6 +257,7 @@ export function buildDtojRecordDetailView(
         scoreText: typeof rdoc.score === 'number' ? String(rdoc.score) : '—',
         cases,
         caseFiles,
+        caseLabels,
         canViewCaseFiles: canReadData,
         downloads,
         showCode,

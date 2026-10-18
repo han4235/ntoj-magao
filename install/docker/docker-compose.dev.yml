@@ -36,6 +36,10 @@ services:
       # templates 是页面模板。整个 ui-default 不能挂，镜像里它的 node_modules 有内容。
       - ../../packages/ui-default/backendlib:/opt/hydro/packages/ui-default/backendlib
       - ../../packages/ui-default/templates:/opt/hydro/packages/ui-default/templates
+      - ../../packages/ui-default/locales:/opt/hydro/packages/ui-default/locales
+      # dtoj-contest 逐文件挂：整个目录挂会盖住镜像里生成的 tsconfig.json
+      - ../../packages/dtoj-contest/index.ts:/opt/hydro/packages/dtoj-contest/index.ts
+      - ../../packages/dtoj-contest/templates:/opt/hydro/packages/dtoj-contest/templates
       # dtoj-record 镜像里没有 node_modules，可以整包挂载；模板和 dtojRecordDetail.ts 都要改
       - ../../packages/dtoj-record:/opt/hydro/packages/dtoj-record
       # dtoj-training 也没有 node_modules，整包挂。课程练习列表上的「移除这道题 / 拖动排序」

@@ -11,7 +11,8 @@ import {
 import { Context, Service } from '../context';
 import {
     BadRequestError, ContestAlreadyAttendedError, ContestAlreadyStartedError, ContestNotAttendedError, ContestNotEndedError,
-    ContestNotFoundError, ContestNotLiveError, ContestScoreboardHiddenError, FileLimitExceededError, FileUploadError,
+    ContestNotFoundError, ContestNotLiveError, ContestPausedError, ContestScoreboardHiddenError, FileLimitExceededError,
+    FileUploadError,
     InvalidTokenError, MethodNotAllowedError, NotAssignedError, NotFoundError, PermissionError, TeamMemberLimitError,
     ValidationError,
 } from '../error';
@@ -95,7 +96,13 @@ export class ContestDetailBaseHandler extends Handler {
                 throw new NotAssignedError('contest', tid);
             }
         }
-        if (this.tdoc.duration && this.tsdoc?.startAt) {
+        if (this.tsdoc?.attend && this.tdoc.allowPause) {
+            const end = contest.personalEndAt(this.tdoc, this.tsdoc);
+            this.tsdoc.endAt = new Date(Math.min(
+                end ? end.getTime() : this.tdoc.endAt.getTime(),
+                this.tsdoc.endAt ? this.tsdoc.endAt.getTime() : Infinity,
+            ));
+        } else if (this.tdoc.duration && this.tsdoc?.startAt) {
             this.tsdoc.endAt = moment.min([
                 moment(this.tsdoc.startAt).add(this.tdoc.duration, 'hours'),
                 moment(this.tdoc.endAt),
@@ -107,7 +114,7 @@ export class ContestDetailBaseHandler extends Handler {
     tsdocAsPublic() {
         if (!this.tsdoc) return null;
         return pick(this.tsdoc, [
-            'attend', 'subscribe', 'startAt',
+            'attend', 'subscribe', 'startAt', 'pauseAt', 'pausedTotal',
             'displayName', 'members', // for team
             ...(this.tdoc.duration || this.tsdoc.endAt ? ['endAt'] : []),
         ]);
@@ -333,6 +340,7 @@ export class ContestProblemListHandler extends ContestDetailBaseHandler {
     @param('tid', Types.ObjectId)
     async prepare(domainId: string, tid: ObjectId) {
         if (contest.RULES[this.tdoc.rule].hidden) throw new ContestNotFoundError(domainId, tid);
+        if (contest.isPaused(this.tdoc, this.tsdoc)) throw new ContestPausedError(domainId, tid);
     }
 
     @param('tid', Types.ObjectId)
@@ -759,10 +767,15 @@ export class ContestUserHandler extends ContestManagementBaseHandler {
     @param('tid', Types.ObjectId)
     async get(domainId: string, tid: ObjectId) {
         const tsdocs = await contest.getMultiStatus(domainId, { docId: tid }).project({
-            uid: 1, attend: 1, startAt: 1, unrank: 1, endAt: 1, displayName: 1, members: 1,
+            uid: 1, attend: 1, startAt: 1, pauseAt: 1, pausedTotal: 1, unrank: 1, endAt: 1, displayName: 1, members: 1,
         }).toArray();
         for (const tsdoc of tsdocs) {
-            if (this.tdoc.duration && tsdoc.startAt) {
+            if (this.tdoc.allowPause) {
+                const end = contest.personalEndAt(this.tdoc, tsdoc as any);
+                if (end) {
+                    tsdoc.endAt = new Date(Math.min(end.getTime(), tsdoc.endAt ? tsdoc.endAt.getTime() : Infinity));
+                }
+            } else if (this.tdoc.duration && tsdoc.startAt) {
                 tsdoc.endAt = moment.min([
                     moment(tsdoc.startAt).add(this.tdoc.duration, 'hours'),
                     moment(this.tdoc.endAt),
@@ -802,10 +815,15 @@ export class ContestUserHandler extends ContestManagementBaseHandler {
     async postResume(domainId: string, tid: ObjectId, uid: number) {
         const tsdoc = await contest.getStatus(domainId, tid, uid);
         if (!tsdoc?.attend) throw new ContestNotAttendedError(uid);
-        if (this.tdoc.endAt <= new Date()) throw new ContestNotLiveError(domainId, tid);
-        if (this.tdoc.duration && tsdoc.startAt) {
-            const durationEnd = moment(tsdoc.startAt).add(this.tdoc.duration, 'hours').toDate();
-            if (durationEnd <= new Date()) throw new ContestNotLiveError(domainId, tid);
+        if (this.tdoc.allowPause) {
+            const end = contest.personalEndAt(this.tdoc, tsdoc);
+            if (end && end <= new Date()) throw new ContestNotLiveError(domainId, tid);
+        } else {
+            if (this.tdoc.endAt <= new Date()) throw new ContestNotLiveError(domainId, tid);
+            if (this.tdoc.duration && tsdoc.startAt) {
+                const durationEnd = moment(tsdoc.startAt).add(this.tdoc.duration, 'hours').toDate();
+                if (durationEnd <= new Date()) throw new ContestNotLiveError(domainId, tid);
+            }
         }
         await contest.setStatus(domainId, tid, uid, null, { endAt: '' });
         this.back();

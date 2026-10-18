@@ -36,6 +36,7 @@ export const RequireProError = Err('RequireProError', ForbiddenError, 'RequirePr
 export const ContestAlreadyAttendedError = Err('ContestAlreadyAttendedError', ForbiddenError, "You've already attended this contest.");
 export const TeamMemberLimitError = Err('TeamMemberLimitError', ForbiddenError, 'Team is full (maximum {0} members).');
 export const ContestNotLiveError = Err('ContestNotLiveError', ForbiddenError, 'This contest is not live.');
+export const ContestPausedError = Err('ContestPausedError', ForbiddenError, 'Contest paused.');
 export const ContestAlreadyStartedError = Err('ContestAlreadyStartedError', ForbiddenError, 'This contest has already started.');
 export const ContestNotEndedError = Err('ContestNotEndedError', ForbiddenError, 'This contest is not ended.');
 export const ContestScoreboardHiddenError = Err('ContestScoreboardHiddenError', ForbiddenError, 'Contest scoreboard is not visible.');

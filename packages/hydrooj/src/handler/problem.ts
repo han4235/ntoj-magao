@@ -304,6 +304,19 @@ export class ProblemDetailHandler extends ContestDetailBaseHandler {
     udoc: User;
     psdoc: ProblemStatusDoc;
 
+    /** 置顶题解按参考答案对待：学生要先 AC 本题。出题人、教师与管理员不受限。 */
+    canViewPinned() {
+        if (this.psdoc?.status === STATUS.STATUS_ACCEPTED) return true;
+        if (this.user.own(this.pdoc)) return true;
+        return this.user.hasPerm(PERM.PERM_EDIT_PROBLEM_SOLUTION);
+    }
+
+    assertPinnedVisible(psdoc: { top?: boolean, docId?: ObjectId }) {
+        if (!psdoc.top || this.canViewPinned()) return;
+        // 用「找不到」而不是「无权限」，不暴露这篇置顶题解存在
+        throw new SolutionNotFoundError(this.pdoc.domainId, psdoc.docId);
+    }
+
     @route('pid', Types.ProblemId, true)
     @query('tid', Types.ObjectId, true)
     @query('trid', Types.ObjectId, true)
@@ -375,8 +388,10 @@ export class ProblemDetailHandler extends ContestDetailBaseHandler {
         // 「AI 生成题解」入口只给能置顶题解的人（管理员、教师）。学生页面不为它白查一次库，
         // 所以这个字段只在有权限时才有值；模板那边先判权限，再看这个字段。
         const canManageSolution = this.user.hasPerm(PERM.PERM_EDIT_PROBLEM_SOLUTION);
+        // 侧栏的题解数跟题解页保持一致：看不到置顶题解的账号也不把它算进去
+        const solutionQuery = { parentId: this.pdoc.docId, ...(this.canViewPinned() ? {} : { top: { $ne: true } }) };
         const [scnt, dcnt, topCnt] = await Promise.all([
-            solution.count(domainId, { parentId: this.pdoc.docId }),
+            solution.count(domainId, solutionQuery),
             discussion.count(domainId, { parentId: this.pdoc.docId }),
             canManageSolution ? solution.count(domainId, { parentId: this.pdoc.docId, top: true }) : 0,
         ]);
@@ -912,14 +927,20 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
             this.checkPerm(PERM.PERM_VIEW_PROBLEM_SOLUTION);
         }
 
+        // 没 AC 的学生列表里不出现置顶题解，计数也跟着走，不留下数量对不上的痕迹
+        const hidePinned = !this.canViewPinned();
+        const hiddenTop = hidePinned
+            ? await solution.count(domainId, { parentId: this.pdoc.docId, top: true })
+            : 0;
         let [psdocs, pcount, pscount] = await this.paginate(
-            solution.getMulti(domainId, this.pdoc.docId),
+            solution.getMulti(domainId, this.pdoc.docId, hidePinned ? { top: { $ne: true } } : {}),
             page,
             'solution',
         );
         if (sid) {
-            psdocs = [await solution.get(domainId, sid)];
-            if (!psdocs[0]) throw new SolutionNotFoundError(domainId, sid);
+            const psdoc = await solution.get(domainId, sid);
+            this.assertPinnedVisible(psdoc);
+            psdocs = [psdoc];
         }
         const uids = [this.pdoc.owner];
         const docids = [];
@@ -933,7 +954,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
         const udict = await user.getList(domainId, uids);
         const pssdict = await solution.getListStatus(domainId, docids, this.user._id);
         this.response.body = {
-            psdocs, page, pcount, pscount, udict, pssdict, pdoc: this.pdoc, sid,
+            psdocs, page, pcount, pscount, udict, pssdict, pdoc: this.pdoc, sid, hiddenTop,
         };
     }
 
@@ -968,6 +989,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
     async postReply(domainId: string, psid: ObjectId, content: string) {
         this.checkPerm(PERM.PERM_REPLY_PROBLEM_SOLUTION);
         const psdoc = await solution.get(domainId, psid);
+        this.assertPinnedVisible(psdoc);
         await solution.reply(domainId, psdoc.docId, this.user._id, content);
         this.back();
     }
@@ -978,6 +1000,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
     async postEditReply(domainId: string, psid: ObjectId, psrid: ObjectId, content: string) {
         const [psdoc, psrdoc] = await solution.getReply(domainId, psid, psrid);
         if (!psdoc || psdoc.parentId !== this.pdoc.docId) throw new SolutionNotFoundError(domainId, psid);
+        this.assertPinnedVisible(psdoc);
         if (!this.user.own(psrdoc) || !this.user.hasPerm(PERM.PERM_EDIT_PROBLEM_SOLUTION_REPLY_SELF)) {
             throw new PermissionError(PERM.PERM_EDIT_PROBLEM_SOLUTION_REPLY_SELF);
         }
@@ -990,6 +1013,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
     async postDeleteReply(domainId: string, psid: ObjectId, psrid: ObjectId) {
         const [psdoc, psrdoc] = await solution.getReply(domainId, psid, psrid);
         if (!psdoc || psdoc.parentId !== this.pdoc.docId) throw new SolutionNotFoundError(domainId, psid);
+        this.assertPinnedVisible(psdoc);
         if (!this.user.own(psrdoc) || !this.user.hasPerm(PERM.PERM_DELETE_PROBLEM_SOLUTION_REPLY_SELF)) {
             this.checkPerm(PERM.PERM_DELETE_PROBLEM_SOLUTION_REPLY);
         }
@@ -1000,6 +1024,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
     @param('psid', Types.ObjectId)
     async postUpvote(domainId: string, psid: ObjectId) {
         this.checkPerm(PERM.PERM_VOTE_PROBLEM_SOLUTION);
+        this.assertPinnedVisible(await solution.get(domainId, psid));
         const psdoc = await solution.vote(domainId, psid, this.user._id, 1);
         this.back({ vote: psdoc.vote, user_vote: 1 });
     }
@@ -1007,6 +1032,7 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
     @param('psid', Types.ObjectId)
     async postDownvote(domainId: string, psid: ObjectId) {
         this.checkPerm(PERM.PERM_VOTE_PROBLEM_SOLUTION);
+        this.assertPinnedVisible(await solution.get(domainId, psid));
         const psdoc = await solution.vote(domainId, psid, this.user._id, -1);
         this.back({ vote: psdoc.vote, user_vote: -1 });
     }
@@ -1037,9 +1063,11 @@ export class ProblemSolutionRawHandler extends ProblemDetailHandler {
         if (psrid) {
             const [psdoc, psrdoc] = await solution.getReply(domainId, psid, psrid);
             if ((!psdoc) || psdoc.parentId !== this.pdoc.docId) throw new SolutionNotFoundError(psid, psrid);
+            this.assertPinnedVisible(psdoc);
             this.response.body = psrdoc.content;
         } else {
             const psdoc = await solution.get(domainId, psid);
+            this.assertPinnedVisible(psdoc);
             this.response.body = psdoc.content;
         }
         this.response.type = 'text/markdown';

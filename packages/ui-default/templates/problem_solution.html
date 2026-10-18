@@ -25,6 +25,7 @@
             <p class="dtoj-sub-lead">
               <a href="{{ url('problem_detail', pid=pdoc.pid|default(pdoc.docId)) }}">{{ pdoc.pid|default(pdoc.docId) }} · {{ pdoc.title }}</a>
               <span>共 {{ pscount }} 篇题解，欢迎分享思路（请勿直接贴可提交代码）</span>
+              {% if hiddenTop %}<span>置顶题解在通过本题后可见</span>{% endif %}
             </p>
           </header>
           <div class="dtoj-solution-body">

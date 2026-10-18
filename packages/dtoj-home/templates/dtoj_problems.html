@@ -122,6 +122,20 @@
   .dtoj-bank-lv[data-diff="5"] { background: #3498db; color: #1a1a1a; }
   .dtoj-bank-lv[data-diff="6"] { background: #9d3dcf; color: #fff; }
   .dtoj-bank-lv[data-diff="7"] { background: #0e1d69; color: #fff; }
+  .dtoj-bank-hidden {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    margin-left: 8px;
+    padding: 0 8px;
+    border: 1px dashed #d9a13b;
+    border-radius: 999px;
+    background: #fff8ea;
+    color: #8a5a00;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: middle;
+  }
   .dtoj-bank-rate { display: flex; align-items: center; gap: 8px; min-width: 120px; }
   .dtoj-bank-rate i { flex: 1; height: 6px; border-radius: 999px; background: #e8eef5; overflow: hidden; }
   .dtoj-bank-rate i b { display: block; height: 100%; background: var(--brand); }
@@ -293,7 +307,7 @@
                 <tr>
                   {% if loggedIn %}<td class="dtoj-bank-check"><input type="checkbox" data-pid="{{ p.pid }}" data-doc="{{ p.docId }}" aria-label="选择 {{ p.title }}"></td>{% endif %}
                   <td class="dtoj-bank-id">{{ p.pid }}</td>
-                  <td class="dtoj-bank-name"><a class="{% if p.hang %}is-hang{% endif %}" href="{{ url('problem_detail', pid=p.link) }}">{{ p.title }}</a></td>
+                  <td class="dtoj-bank-name"><a class="{% if p.hang %}is-hang{% endif %}" href="{{ url('problem_detail', pid=p.link) }}">{{ p.title }}</a>{% if p.hidden %}<span class="dtoj-bank-hidden" title="已隐藏，只在管理员和维护者的题库里出现">隐藏</span>{% endif %}</td>
                   {% if showTags %}
                   <td class="dtoj-bank-tags-col">
                     {% if p.tags.length %}

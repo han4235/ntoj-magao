@@ -5,16 +5,14 @@
   {% if rdoc.testCases and rdoc.testCases.length %}
   <div class="dtoj-record-cases">
   <div class="dtoj-case-grid">
-    {% set caseGroups = rdoc.testCases|groupby('subtaskId') %}
-    {% set multiGroup = caseGroups|length > 1 %}
-    {% for subtaskId, cases in rdoc.testCases|sort(false, false, 'subtaskId')|groupby('subtaskId') %}
+    {% for _subtaskId, cases in rdoc.testCases|sort(false, false, 'subtaskId')|groupby('subtaskId') %}
     {% for tc in cases|sort(false, false, 'id') %}
-    {% set caseNo = (((subtaskId|int) + 1) ~ '-' ~ (tc.id|default(loop.index))) if multiGroup else (tc.id|default(loop.index)) %}
+    {% set caseKey = (tc.subtaskId|default(0)) ~ ':' ~ (tc.id|default(0)) %}
+    {% set caseNo = caseLabels[caseKey] if caseLabels and caseLabels[caseKey] else (tc.id|default(loop.index)) %}
     {% set caseName = model.builtin.STATUS_TEXTS[tc.status] or '' %}
     {% set caseScore = tc.score|default(0) %}
     {% set caseTime = tc.time|round|int %}
     {% set caseMem = (tc.memory / 1024)|round(2) ~ 'MB' if tc.memory >= 1024 else (tc.memory|round(0) ~ 'KB') %}
-    {% set caseKey = (tc.subtaskId|default(0)) ~ ':' ~ (tc.id|default(loop.index)) %}
     {% set caseUrls = caseFiles[caseKey] if caseFiles else null %}
     <div class="dtoj-case {{ model.builtin.STATUS_CODES[tc.status] }}{% if canViewCaseFiles and caseUrls and (caseUrls.in or caseUrls.out) %} dtoj-case--pickable{% endif %}" data-case-no="#{{ caseNo }}"{% if caseUrls and caseUrls.in %} data-in-url="{{ caseUrls.in }}" data-in-size="{{ caseUrls.inSize|default(0) }}"{% endif %}{% if caseUrls and caseUrls.out %} data-out-url="{{ caseUrls.out }}" data-out-size="{{ caseUrls.outSize|default(0) }}"{% endif %} data-tooltip="测试点 #{{ caseNo }}<br>{{ caseName }}<br>得分 {{ caseScore }}<br>用时 {{ caseTime }}ms，内存 {{ caseMem }}">
       <span class="dtoj-case-num">#{{ caseNo }}</span>

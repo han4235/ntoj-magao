@@ -49,6 +49,7 @@
   }
   .dtoj-race-phase.is-wait { background: #f8f1dc; color: #6a4b00; }
   .dtoj-race-phase.is-done { background: #eef2f6; color: var(--muted); }
+  .dtoj-race-phase.is-pause { background: #fde8e8; color: #9b1c1c; }
   .dtoj-race-clock-note { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
   .dtoj-race-clock {
     display: flex;
@@ -66,6 +67,7 @@
     color: var(--brand);
   }
   .dtoj-race-clock.is-done b { color: var(--muted); }
+  .dtoj-race-clock.is-paused b { color: #9b1c1c; }
   .dtoj-race-clock span,
   .dtoj-race-clock i { color: var(--muted); font-size: 14px; font-weight: 700; font-style: normal; }
   .dtoj-race-meta,
@@ -178,16 +180,16 @@
         {% if canEdit %}<a class="dtoj-race-edit" href="{{ url('dtoj_contest_edit', tid=contest.id) }}">编辑</a>{% endif %}
       </header>
       <article class="dtoj-panel dtoj-race-hero">
-        <p class="dtoj-race-phase {% if contest.phase == '尚未开始' %}is-wait{% elif contest.phase == '已结束' %}is-done{% endif %}">{{ contest.phase }}</p>
+        <p class="dtoj-race-phase {% if contest.phase == '尚未开始' %}is-wait{% elif contest.phase == '已结束' %}is-done{% elif contest.paused %}is-pause{% endif %}">{{ contest.phase }}{% if contest.paused %} · 已暂停{% endif %}</p>
         <p class="dtoj-race-clock-note">{{ contest.clock.note }}</p>
-        <div class="dtoj-race-clock {% if contest.clock.mode == 'done' %}is-done{% endif %}" data-clock data-mode="{{ contest.clock.mode }}" data-until="{{ contest.clock.until }}" aria-live="polite">
+        <div class="dtoj-race-clock {% if contest.clock.mode == 'done' %}is-done{% elif contest.clock.mode == 'paused' %}is-paused{% endif %}" data-clock data-mode="{{ contest.clock.mode }}" data-until="{{ contest.clock.until }}" aria-live="polite">
           <b data-h>00</b><span>时</span>
           <i aria-hidden="true">:</i>
           <b data-m>00</b><span>分</span>
           <i aria-hidden="true">:</i>
           <b data-s>00</b><span>秒</span>
         </div>
-        <p class="dtoj-race-meta"><b>{{ contest.rule }}</b> · 题目 {{ contest.problems }} · 持续时间 {{ contest.hours }} 小时</p>
+        <p class="dtoj-race-meta"><b>{{ contest.rule }}</b> · 题目 {{ contest.problems }} · 开放窗口 {{ contest.hours }} 小时{% if contest.personal %} · 个人作答 {{ contest.personalHours }} 小时{% endif %}</p>
         <p class="dtoj-race-when">开始于 <b>{% if contest.beginAt %}{{ datetimeSpan(contest.beginAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %}</b> · 结束于 <b>{% if contest.endAt %}{{ datetimeSpan(contest.endAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %}</b></p>
       </article>
       <div class="dtoj-race-layout">
@@ -235,8 +237,11 @@
               <h2>比赛安排</h2>
               <ul class="dtoj-race-plan">
                 <li>开放窗口：{% if contest.beginAt %}{{ datetimeSpan(contest.beginAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %} 至 {% if contest.endAt %}{{ datetimeSpan(contest.endAt, false, 'YYYY-M-D HH:mm')|safe }}{% else %}—{% endif %}。</li>
-                {% if contest.personal %}
-                <li>{{ contest.access }}参赛。参加后个人计时 {{ contest.hours }} 小时，最迟在窗口结束时截止。</li>
+                {% if contest.allowPause %}
+                <li>{{ contest.access }}参赛。个人作答 {{ contest.personalHours }} 小时，随时可以暂停；暂停期间不能看题和提交，暂停时间不计入时长。</li>
+                <li>累计用满个人时长才算结束，个人截止时间可以晚于整场结束时间。</li>
+                {% elif contest.personal %}
+                <li>{{ contest.access }}参赛。参加后个人计时 {{ contest.personalHours }} 小时，最迟在窗口结束时截止。</li>
                 {% else %}
                 <li>{{ contest.access }}参赛。全场统一计时 {{ contest.hours }} 小时。</li>
                 {% endif %}
@@ -258,7 +263,24 @@
           <h2>比赛</h2>
           {% if contest.attended %}
           <p class="dtoj-race-attended">已参加</p>
+          {% if contest.canPause %}
+            {% if contest.paused %}
+            <form method="post" action="{{ url('dtoj_contest_detail', tid=contest.id) }}" style="margin: 0 0 10px;">
+              <input type="hidden" name="operation" value="resume">
+              <button class="dtoj-race-join" type="submit">继续计时</button>
+            </form>
+            {% elif contest.running %}
+            <form method="post" action="{{ url('dtoj_contest_detail', tid=contest.id) }}" style="margin: 0 0 10px;">
+              <input type="hidden" name="operation" value="pause">
+              <button class="dtoj-race-join" type="submit">暂停计时</button>
+            </form>
+            {% endif %}
+          {% endif %}
+          {% if contest.paused %}
+          <p class="dtoj-race-help">暂停中，继续计时后才能进入题目。</p>
+          {% else %}
           <a class="dtoj-race-help" href="{{ url('dtoj_contest_detail', tid=contest.id, query={part: 'problems'}) }}">进入题目</a>
+          {% endif %}
           {% elif not loggedIn %}
           <a class="dtoj-race-join" href="{{ url('user_login') }}">登录后参加比赛</a>
           {% elif contest.phase != '已结束' %}
@@ -297,6 +319,7 @@
     function paint() {
       var left = 0;
       if (mode === 'count' && until) left = Math.max(0, until - Date.now());
+      if (mode === 'paused') left = Math.max(0, until);
       var sec = Math.floor(left / 1000);
       h.textContent = pad(Math.floor(sec / 3600));
       m.textContent = pad(Math.floor((sec % 3600) / 60));

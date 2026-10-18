@@ -131,7 +131,11 @@
             </label>
             <label>开始日期<input class="textbox" type="date" name="beginDate" value="{{ beginDate }}"></label>
             <label>开始时间<input class="textbox" type="time" name="beginTime" value="{{ beginTime }}"></label>
-            <label>时长（小时）<input class="textbox" name="duration" value="{{ duration }}" inputmode="decimal"></label>
+            <label>开放窗口（小时）<input class="textbox" name="duration" value="{{ duration }}" inputmode="decimal" placeholder="比如 72 表示三天内都能参加"></label>
+            <label>个人作答时长（小时）<input class="textbox" name="personalHours" value="{{ personalHours }}" inputmode="decimal" placeholder="留空则和开放窗口相同"></label></label>
+            <label class="dtoj-race-feature">暂停计时
+              <span><input type="checkbox" name="allowPause" value="1" {% if allowPause %}checked{% endif %}> 允许选手中途暂停个人计时，暂停时间不计入比赛时长</span>
+            </label>
             <label>邀请码<input class="textbox" name="code" value="{{ code }}" placeholder="留空则公开"></label>
           </div>
           <label class="dtoj-field">简介<textarea class="textbox" name="content">{{ content }}</textarea></label>

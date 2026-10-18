@@ -186,6 +186,10 @@ export class RecordDetailHandler extends ContestDetailBaseHandler {
             if (rdoc.uid !== this.user._id) throw new PermissionError(PERM.PERM_READ_RECORD_CODE);
         } else if (rdoc.contest) {
             this.tdoc = await contest.get(domainId, rdoc.contest);
+            if (this.tdoc.allowPause) {
+                const teamVid = this.tdoc.allowTeam ? await contest.getTeamVid(domainId, this.tdoc.docId, this.user._id) : null;
+                this.tsdoc = await contest.getStatus(domainId, this.tdoc.docId, teamVid ?? this.user._id);
+            }
             let canView = this.user.own(this.tdoc);
             canView ||= contest.canShowRecord.call(this, this.tdoc);
             canView ||= contest.canShowSelfRecord.call(this, this.tdoc, true) && isOwnOrTeammate;
@@ -430,6 +434,10 @@ export class RecordDetailConnectionHandler extends ConnectionHandler {
         const isOwnOrTeammate = await contest.isOwnOrTeammateRecord(domainId, rdoc, this.user._id);
         if (rdoc.contest && ![record.RECORD_GENERATE, record.RECORD_PRETEST].some((i) => i.toHexString() === rdoc.contest.toHexString())) {
             this.tdoc = await contest.get(domainId, rdoc.contest);
+            if (this.tdoc.allowPause) {
+                const teamVid = this.tdoc.allowTeam ? await contest.getTeamVid(domainId, this.tdoc.docId, this.user._id) : null;
+                this.tsdoc = await contest.getStatus(domainId, this.tdoc.docId, teamVid ?? this.user._id);
+            }
             let canView = this.user.own(this.tdoc);
             canView ||= contest.canShowRecord.call(this, this.tdoc);
             canView ||= isOwnOrTeammate && contest.canShowSelfRecord.call(this, this.tdoc);

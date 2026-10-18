@@ -295,6 +295,9 @@ export interface Tdoc extends Document {
      */
     duration: number;
 
+    /** 允许选手暂停个人计时，暂停时间不计入比赛时长 */
+    allowPause?: boolean;
+
     // For homework
     penaltySince?: Date;
     penaltyRules?: PenaltyRules;
@@ -479,6 +482,8 @@ export interface ContestStatusDoc extends StatusDocBase, ContestStat {
     journal?: ContestJournalEntry[];
     startAt?: Date;
     endAt?: Date; // 灵活时间模式的结束时间，或者是提前结束比赛的时间
+    pauseAt?: Date; // 暂停计时开始时间，暂停中才有
+    pausedTotal?: number; // 已累计暂停的毫秒数
     rev?: number;
     displayName?: string;
     members?: number[];

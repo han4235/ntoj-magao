@@ -1,12 +1,19 @@
 import { escapeRegExp } from 'lodash';
 import {
-    ContestModel, ContestNotFoundError, ContestNotLiveError, Context, DomainModel, InvalidTokenError, NotAssignedError,
-    ObjectId, PERM, PRIV, ProblemModel, StorageModel, Types, UserModel, moment, param,
+    ContestModel, ContestNotAttendedError, ContestNotFoundError, ContestNotLiveError, Context, DomainModel, InvalidTokenError, NotAssignedError,
+    ObjectId, PERM, PRIV, ProblemModel, StorageModel, Types, UserModel, ValidationError, moment, param,
 } from 'hydrooj';
 import { DtojDataHandler, dropEarlierRoutes, pick, queryOf } from 'dtoj-ui';
 import { contestKinds, contestTabs, mockLevels, mockTracks } from './data';
 
-function contestHours(tdoc: { duration?: number, beginAt?: Date, endAt?: Date }) {
+function contestHours(tdoc: { beginAt?: Date, endAt?: Date }) {
+    const raw = (new Date(tdoc.endAt).getTime() - new Date(tdoc.beginAt).getTime()) / 3600000;
+    if (!Number.isFinite(raw)) return '—';
+    return (Math.round(raw * 10) / 10).toFixed(1);
+}
+
+/** 个人作答时长：设了 duration 用它，否则与开放时长相同。 */
+function personalHoursOf(tdoc: { duration?: number, beginAt?: Date, endAt?: Date }) {
     const raw = tdoc.duration
         ? Number(tdoc.duration)
         : (new Date(tdoc.endAt).getTime() - new Date(tdoc.beginAt).getTime()) / 3600000;
@@ -99,6 +106,7 @@ function contestCard(tdoc: any) {
         brief: String(tdoc.content || '').trim(),
         rated: !!tdoc.rated,
         hours: contestHours(tdoc),
+        personalHours: personalHoursOf(tdoc),
         problems: Array.isArray(tdoc.pids) ? tdoc.pids.length : 0,
         people: tdoc.attend || 0,
         rule: rule ? rule.TEXT : '',
@@ -328,9 +336,18 @@ function prettyHours(raw: string) {
 }
 
 function clockOf(tdoc: any, tsdoc: any) {
+    const now = Date.now();
     if (ContestModel.isDone(tdoc, tsdoc)) return { mode: 'done', until: 0, note: '比赛已结束' };
+    if (ContestModel.isPaused(tdoc, tsdoc)) {
+        const end = ContestModel.personalEndAt(tdoc, tsdoc, now);
+        return { mode: 'paused', until: Math.max(0, end.getTime() - now), note: '已暂停，个人计时还剩' };
+    }
     if (tdoc.duration && !tsdoc?.startAt) {
         return { mode: 'wait', until: 0, note: '尚未开始计时。参加并进入题目后，按个人时长计时。' };
+    }
+    if (tdoc.allowPause && tsdoc?.startAt) {
+        const end = ContestModel.personalEndAt(tdoc, tsdoc, now);
+        if (end) return { mode: 'count', until: end.getTime(), note: '个人计时还剩' };
     }
     if (tdoc.duration && tsdoc?.startAt) {
         return {
@@ -381,13 +398,20 @@ class DtojContestDetailHandler extends DtojDataHandler {
         const pdict = canSeeProblems ? await ProblemModel.getList(domainId, pids, canViewHidden, false) : {};
         const part = pick(queryOf(this, 'part'), ['overview', 'problems', 'board'], 'overview');
         const card = contestCard(tdoc);
+        const paused = ContestModel.isPaused(tdoc, tsdoc);
         this.view('dtoj_contest_detail', {
             contest: {
                 ...card,
                 hours: prettyHours(card.hours),
+                personalHours: prettyHours(card.personalHours),
                 content: tdoc.content || '',
                 overview: tdoc.dtoj?.overview || '',
-                personal: !!tdoc.duration,
+                personal: !!(tdoc.duration || tdoc.allowPause),
+                allowPause: !!tdoc.allowPause,
+                paused,
+                canPause: !!tdoc.allowPause && !!tsdoc?.attend && !ContestModel.isDone(tdoc, tsdoc),
+                running: !!tsdoc?.attend && ContestModel.isOngoing(tdoc, tsdoc),
+                started: !!tsdoc?.startAt,
                 rated: !!tdoc.rated,
                 invite: !!tdoc._code,
                 owner: owner?.uname || '—',
@@ -420,7 +444,41 @@ class DtojContestDetailHandler extends DtojDataHandler {
         const tdoc = await this.loadContest(domainId, tid);
         if (ContestModel.isDone(tdoc)) throw new ContestNotLiveError(domainId, tid);
         if (tdoc._code && code !== tdoc._code) throw new InvalidTokenError('Contest Invitation', code);
-        await ContestModel.attend(domainId, tid, this.user._id, { subscribe: 1 });
+        const payload: any = { subscribe: 1 };
+        if (tdoc.allowPause && tdoc.beginAt <= new Date()) payload.startAt = new Date();
+        await ContestModel.attend(domainId, tid, this.user._id, payload);
+        this.back();
+    }
+
+    @param('tid', Types.ObjectId)
+    async postPause(domainId: string, tid: ObjectId) {
+        if (!this.user.hasPriv(PRIV.PRIV_USER_PROFILE)) this.checkPriv(PRIV.PRIV_USER_PROFILE);
+        const tdoc = await this.loadContest(domainId, tid);
+        if (!tdoc.allowPause) throw new ContestNotLiveError(domainId, tid);
+        const tsdoc = await ContestModel.getStatus(domainId, tid, this.user._id);
+        if (!tsdoc?.attend) throw new ContestNotAttendedError(domainId, tid);
+        if (tsdoc.pauseAt) throw new ValidationError('pauseAt');
+        if (!ContestModel.isOngoing(tdoc, tsdoc)) throw new ContestNotLiveError(domainId, tid);
+        const now = new Date();
+        await ContestModel.setStatus(domainId, tid, this.user._id, {
+            pauseAt: now,
+            ...(tsdoc.startAt ? {} : { startAt: now }),
+        });
+        this.back();
+    }
+
+    @param('tid', Types.ObjectId)
+    async postResume(domainId: string, tid: ObjectId) {
+        if (!this.user.hasPriv(PRIV.PRIV_USER_PROFILE)) this.checkPriv(PRIV.PRIV_USER_PROFILE);
+        const tdoc = await this.loadContest(domainId, tid);
+        if (!tdoc.allowPause) throw new ContestNotLiveError(domainId, tid);
+        const tsdoc = await ContestModel.getStatus(domainId, tid, this.user._id);
+        if (!tsdoc?.attend) throw new ContestNotAttendedError(domainId, tid);
+        if (!tsdoc.pauseAt) throw new ValidationError('pauseAt');
+        const now = Date.now();
+        const pausedTotal = (Number(tsdoc.pausedTotal) || 0)
+            + Math.max(0, now - new Date(tsdoc.pauseAt).getTime());
+        await ContestModel.setStatus(domainId, tid, this.user._id, { pausedTotal }, { pauseAt: '' });
         this.back();
     }
 }
@@ -503,6 +561,10 @@ class DtojContestEditHandler extends DtojDataHandler {
             beginDate: body.beginDate ?? begin.format('YYYY-MM-DD'),
             beginTime: body.beginTime ?? begin.format('HH:mm'),
             duration: body.duration ?? (tdoc ? contestHours(tdoc) : '2'),
+            personalHours: body.personalHours ?? (tdoc?.duration ? String(tdoc.duration) : ''),
+            allowPause: body.allowPause !== undefined
+                ? body.allowPause === '1' || body.allowPause === 'on'
+                : !!tdoc?.allowPause,
             pids: body.pids ?? '',
             code: body.code ?? tdoc?._code ?? '',
             pq: body.pq || '',
@@ -539,6 +601,8 @@ class DtojContestEditHandler extends DtojDataHandler {
             beginDate: body.beginDate || '',
             beginTime: body.beginTime || '',
             duration: body.duration || '',
+            personalHours: body.personalHours || '',
+            allowPause: body.allowPause === '1' || body.allowPause === 'on' ? '1' : '',
             pids: body.pids || '',
             code: body.code || '',
             pq: body.pq || '',
@@ -556,11 +620,15 @@ class DtojContestEditHandler extends DtojDataHandler {
     @param('beginDate', Types.String, true)
     @param('beginTime', Types.String, true)
     @param('duration', Types.String, true)
+    @param('personalHours', Types.String, true)
+    @param('allowPause', Types.String, true)
     @param('pids', Types.String, true)
     @param('code', Types.String, true)
     @param('pq', Types.String, true)
-    async postSearch(domainId: string, title = '', tab = '', featured = '', track = '', level = '', content = '', overview = '', rule = '', beginDate = '', beginTime = '', duration = '', pids = '', code = '', pq = '') {
-        const draft = this.draft({ title, tab, featured, track, level, content, overview, rule, beginDate, beginTime, duration, pids, code, pq });
+    async postSearch(domainId: string, title = '', tab = '', featured = '', track = '', level = '', content = '', overview = '', rule = '', beginDate = '', beginTime = '', duration = '', personalHours = '', allowPause = '', pids = '', code = '', pq = '') {
+        const draft = this.draft({
+            title, tab, featured, track, level, content, overview, rule, beginDate, beginTime, duration, personalHours, allowPause, pids, code, pq,
+        });
         this.form(domainId, { ...draft, hits: await searchProblems(domainId, pq) });
     }
 
@@ -588,6 +656,8 @@ class DtojContestEditHandler extends DtojDataHandler {
     @param('beginDate', Types.String, true)
     @param('beginTime', Types.String, true)
     @param('duration', Types.String, true)
+    @param('personalHours', Types.String, true)
+    @param('allowPause', Types.String, true)
     @param('pids', Types.String, true)
     @param('code', Types.String, true)
     @param('pq', Types.String, true)
@@ -604,11 +674,15 @@ class DtojContestEditHandler extends DtojDataHandler {
         beginDate = '',
         beginTime = '',
         duration = '',
+        personalHours = '',
+        allowPause = '',
         pids = '',
         code = '',
         pq = '',
     ) {
-        const draft = this.draft({ title, tab, featured, track, level, content, overview, rule, beginDate, beginTime, duration, pids, code, pq });
+        const draft = this.draft({
+            title, tab, featured, track, level, content, overview, rule, beginDate, beginTime, duration, personalHours, allowPause, pids, code, pq,
+        });
         const nextTab = pick(tab, contestKinds, '其他');
         const nextTitle = title.trim();
         const nextContent = content.trim();
@@ -633,7 +707,7 @@ class DtojContestEditHandler extends DtojDataHandler {
             return;
         }
         if (!Number.isFinite(hours) || hours <= 0) {
-            this.form(domainId, { ...draft, error: '时长要写大于 0 的小时数。' });
+            this.form(domainId, { ...draft, error: '开放窗口要写大于 0 的小时数。' });
             return;
         }
         const found = await problemsOf(domainId, pids);
@@ -643,6 +717,12 @@ class DtojContestEditHandler extends DtojDataHandler {
         }
         const beginAt = begin.toDate();
         const endAt = begin.clone().add(hours, 'hours').toDate();
+        const personal = personalHours.trim() ? Number(personalHours) : 0;
+        if (!Number.isFinite(personal) || personal < 0) {
+            this.form(domainId, { ...draft, error: '个人作答时长要写成不小于 0 的小时数，留空表示和开放窗口相同。' });
+            return;
+        }
+        const nextAllowPause = allowPause === '1' || allowPause === 'on';
         const nextCode = code.trim();
         const dtoj = {
             tab: nextTab,
@@ -654,7 +734,13 @@ class DtojContestEditHandler extends DtojDataHandler {
         let tid = this.tdoc?.docId as ObjectId | undefined;
         if (!tid) {
             tid = await ContestModel.add(
-                domainId, nextTitle, nextContent, this.user._id, rule, beginAt, endAt, found.pids, false, { _code: nextCode, dtoj } as any,
+                domainId, nextTitle, nextContent, this.user._id, rule, beginAt, endAt, found.pids, false,
+                {
+                    _code: nextCode,
+                    dtoj,
+                    duration: personal > 0 ? personal : null,
+                    allowPause: nextAllowPause,
+                } as any,
             );
         } else {
             await ContestModel.edit(domainId, tid, {
@@ -666,6 +752,8 @@ class DtojContestEditHandler extends DtojDataHandler {
                 pids: found.pids,
                 _code: nextCode,
                 dtoj,
+                duration: personal > 0 ? personal : null,
+                allowPause: nextAllowPause,
             } as any);
         }
         this.response.redirect = this.url('dtoj_contest_detail', { tid });

@@ -61,16 +61,54 @@ export function isNotStarted(tdoc: Tdoc) {
     return (new Date()) < tdoc.beginAt;
 }
 
+/** 已累计暂停的毫秒数，包含正在进行的这一段暂停。 */
+export function pausedTime(tsdoc?: ContestStatusDoc, now = Date.now()): number {
+    if (!tsdoc) return 0;
+    const total = Number(tsdoc.pausedTotal) || 0;
+    if (tsdoc.pauseAt) return total + Math.max(0, now - new Date(tsdoc.pauseAt).getTime());
+    return total;
+}
+
+export function isPaused(tdoc: Tdoc, tsdoc?: ContestStatusDoc): boolean {
+    return !!tdoc.allowPause && !!tsdoc?.pauseAt;
+}
+
+/**
+ * 个人计时的截止时间。
+ * 普通灵活时间模式：首次进入后开始计时，截止为 startAt + duration。
+ * 允许暂停时：截止时间额外顺延已暂停的时长，可以晚于整场比赛的结束时间。
+ */
+export function personalEndAt(tdoc: Tdoc, tsdoc?: ContestStatusDoc, now = Date.now()): Date | null {
+    const paused = tdoc.allowPause ? pausedTime(tsdoc, now) : 0;
+    if (tdoc.duration) {
+        if (!tsdoc?.startAt) return null;
+        return new Date(new Date(tsdoc.startAt).getTime() + tdoc.duration * Time.hour + paused);
+    }
+    if (!tdoc.allowPause) return null;
+    return new Date(tdoc.endAt.getTime() + paused);
+}
+
 export function isOngoing(tdoc: Tdoc, tsdoc?: ContestStatusDoc): boolean {
     const now = new Date();
     if (tsdoc?.endAt && tsdoc.endAt <= now) return false;
+    if (tdoc.allowPause) {
+        if (isPaused(tdoc, tsdoc)) return false;
+        if (now < tdoc.beginAt) return false;
+        const end = personalEndAt(tdoc, tsdoc, now.getTime());
+        return now < (end || tdoc.endAt);
+    }
     if (tsdoc && tdoc.duration && tsdoc.startAt <= new Date(Date.now() - Math.floor(tdoc.duration * Time.hour))) return false;
     return (tdoc.beginAt <= now && now < tdoc.endAt);
 }
 
 export function isDone(tdoc: Tdoc, tsdoc?: ContestStatusDoc): boolean {
-    if (tdoc.endAt <= new Date()) return true;
-    if (tsdoc?.endAt && tsdoc.endAt <= new Date()) return true;
+    const now = new Date();
+    if (tsdoc?.endAt && tsdoc.endAt <= now) return true;
+    if (tdoc.allowPause) {
+        const end = personalEndAt(tdoc, tsdoc, now.getTime());
+        return (end || tdoc.endAt) <= now;
+    }
+    if (tdoc.endAt <= now) return true;
     if (tsdoc && tdoc.duration && tsdoc.startAt <= new Date(Date.now() - Math.floor(tdoc.duration * Time.hour))) return true;
     return false;
 }
@@ -1087,20 +1125,26 @@ export function canViewHiddenScoreboard(this: { user: User }, tdoc: Tdoc) {
     return this.user.hasPerm(PERM.PERM_VIEW_CONTEST_HIDDEN_SCOREBOARD);
 }
 
-export function canShowRecord(this: { user: User }, tdoc: Tdoc, allowPermOverride = true) {
-    if (RULES[tdoc.rule].showRecord(tdoc, new Date())) return true;
+/** 允许暂停的比赛里，本人还没用完个人时长时，不向他公开成绩和代码。 */
+function stillRunning(this: { tsdoc?: ContestStatusDoc }, tdoc: Tdoc) {
+    if (!tdoc.allowPause) return false;
+    return !!this.tsdoc?.attend && !isDone(tdoc, this.tsdoc);
+}
+
+export function canShowRecord(this: { user: User, tsdoc?: ContestStatusDoc }, tdoc: Tdoc, allowPermOverride = true) {
+    if (!stillRunning.call(this, tdoc) && RULES[tdoc.rule].showRecord(tdoc, new Date())) return true;
     if (allowPermOverride && canViewHiddenScoreboard.call(this, tdoc)) return true;
     return false;
 }
 
-export function canShowSelfRecord(this: { user: User }, tdoc: Tdoc, allowPermOverride = true) {
-    if (RULES[tdoc.rule].showSelfRecord(tdoc, new Date())) return true;
+export function canShowSelfRecord(this: { user: User, tsdoc?: ContestStatusDoc }, tdoc: Tdoc, allowPermOverride = true) {
+    if (!stillRunning.call(this, tdoc) && RULES[tdoc.rule].showSelfRecord(tdoc, new Date())) return true;
     if (allowPermOverride && canViewHiddenScoreboard.call(this, tdoc)) return true;
     return false;
 }
 
-export function canShowScoreboard(this: { user: User }, tdoc: Tdoc, allowPermOverride = true) {
-    if (RULES[tdoc.rule].showScoreboard(tdoc, new Date())) return true;
+export function canShowScoreboard(this: { user: User, tsdoc?: ContestStatusDoc }, tdoc: Tdoc, allowPermOverride = true) {
+    if (!stillRunning.call(this, tdoc) && RULES[tdoc.rule].showScoreboard(tdoc, new Date())) return true;
     if (allowPermOverride && canViewHiddenScoreboard.call(this, tdoc)) return true;
     return false;
 }
@@ -1273,6 +1317,9 @@ global.Hydro.model.contest = {
     isDone,
     isLocked,
     isExtended,
+    pausedTime,
+    isPaused,
+    personalEndAt,
     applyProjection,
     statusText,
     addPrintTask,

@@ -14,6 +14,7 @@ import { randomstring, sortFiles, streamToBuffer } from '@hydrooj/utils/lib/util
 import type { Context } from '../context';
 import {
     BadRequestError, ContestNotAttendedError, ContestNotEndedError, ContestNotFoundError, ContestNotLiveError,
+    ContestPausedError,
     TrainingNotEnrolledError, TrainingNotFoundError,
     FileLimitExceededError, FileTooLargeError, HackFailedError, NoProblemError, NotFoundError,
     PermissionError, ProblemAlreadyExistError, ProblemAlreadyUsedByContestError, ProblemConfigError,
@@ -312,6 +313,7 @@ export class ProblemDetailHandler extends ContestDetailBaseHandler {
         if (tid) {
             if (!this.tdoc?.pids?.includes(this.pdoc.docId)) throw new ContestNotFoundError(domainId, tid);
             if (contest.isNotStarted(this.tdoc)) throw new ContestNotLiveError(tid);
+            if (contest.isPaused(this.tdoc, this.tsdoc)) throw new ContestPausedError(tid);
             if (!contest.isDone(this.tdoc, this.tsdoc)) {
                 if (!this.tsdoc?.attend) throw new ContestNotAttendedError(tid);
                 if (this.tsdoc.attend && !this.tsdoc.startAt && contest.isOngoing(this.tdoc)) {

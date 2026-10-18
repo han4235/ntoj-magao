@@ -2296,6 +2296,21 @@
       return;
     }
     var escapePrefix = el.getAttribute('data-dtoj-back-escape');
+    // 「返回题库」这类标签写死了目的地，但默认走 history.back()：
+    // 上一页是登录页（隐藏题先跳登录）时，点一下只会回到登录页再被弹回来，
+    // 看着就是「点了没反应」。上一页不在同一区块时就直奔目的地。
+    var samePrefix = el.getAttribute('data-dtoj-back-same');
+    if (samePrefix) {
+      var refPath = '';
+      try {
+        var ref = new URL(document.referrer);
+        if (ref.origin === location.origin) refPath = ref.pathname;
+      } catch (e) {}
+      if (!refPath || refPath.indexOf(samePrefix) !== 0) {
+        if (fallback) location.assign(fallback);
+        return;
+      }
+    }
     if (escapePrefix && stillInEscapeZone(location.pathname, escapePrefix)) {
       if (fallback && isTrainingListUrl(fallback)) {
         location.assign(fallback);

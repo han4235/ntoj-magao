@@ -17,7 +17,7 @@
         {% else %}
         <h1>评测记录</h1>
         <div class="dtoj-rule" aria-hidden="true"></div>
-        <p>按题目、提交者、语言和状态查看评测。学生默认只看自己；从题目页进入可查看本题全部提交。</p>
+        <p>按题目、提交者、语言、状态和来源查看评测。学生默认只看自己；从题目页进入可查看本题全部提交。</p>
         {% endif %}
       </header>
       <form method="get" class="dtoj-sheet dtoj-sheet-pad dtoj-record-filter">
@@ -44,6 +44,15 @@
               {% endfor %}
             </select>
           </label>
+          {% if canFilterSource %}
+          <label>来源
+            <select class="select" name="source">
+              <option value="">全部</option>
+              <option value="practice" {% if source == 'practice' %}selected{% endif %}>题库</option>
+              <option value="contest" {% if source == 'contest' %}selected{% endif %}>作业/比赛</option>
+            </select>
+          </label>
+          {% endif %}
         </div>
         <div class="dtoj-actions">
           <button type="submit" class="dtoj-go">筛选</button>

@@ -52,11 +52,12 @@ class DtojRecordHandler extends DtojDataHandler {
     @param('uidOrName', Types.UidOrName, true)
     @param('lang', Types.String, true)
     @param('status', Types.Int, true)
+    @param('source', Types.String, true)
     async get(
         domainId: string, page = 1, pid?: string | number,
-        uidOrName?: string, lang?: string, status?: number,
+        uidOrName?: string, lang?: string, status?: number, source?: string,
     ) {
-        const q: any = { contest: null };
+        const q: any = {};
         let invalid = false;
         if (uidOrName) {
             const udoc = await UserModel.getById(domainId, +uidOrName)
@@ -84,6 +85,14 @@ class DtojRecordHandler extends DtojDataHandler {
         }
         if (lang) q.lang = lang;
         if (typeof status === 'number') q.status = status;
+        // 来源：practice=题库练习，contest=作业/比赛，空=全部。
+        // 学生只能看到自己的作业提交；查看他人或本题全部提交时仍只返回题库记录，避免比赛期间泄题。
+        const selfOnly = q.uid !== undefined && q.uid === this.user._id;
+        let src = source === 'practice' || source === 'contest' ? source : '';
+        if (!canViewAllRecords && !selfOnly) src = 'practice';
+        if (src === 'practice') q.contest = null;
+        else if (src === 'contest') q.contest = { $ne: null };
+        const canFilterSource = canViewAllRecords || !problemRecordList;
         const projection: Record<string, 1> = {};
         for (const key of RecordModel.PROJECTION_LIST) projection[key] = 1;
         const [rdocs, rpcount] = invalid
@@ -134,9 +143,13 @@ class DtojRecordHandler extends DtojDataHandler {
             pid: pid || '',
             lang: lang || '',
             status: typeof status === 'number' ? String(status) : '',
+            source: src,
+            canFilterSource,
             page,
             pages: rpcount,
-            qs: queryString({ uidOrName, pid, lang, status }),
+            qs: queryString({
+                uidOrName, pid, lang, status, source: src || undefined,
+            }),
         });
     }
 }

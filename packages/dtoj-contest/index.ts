@@ -394,8 +394,9 @@ class DtojContestDetailHandler extends DtojDataHandler {
             ? this.user.hasPerm(PERM.PERM_EDIT_CONTEST_SELF)
             : this.user.hasPerm(PERM.PERM_EDIT_CONTEST);
         const canSeeProblems = !!tsdoc?.attend || ContestModel.isDone(tdoc, tsdoc) || canEdit;
-        const canViewHidden = this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || this.user._id;
-        const pdict = canSeeProblems ? await ProblemModel.getList(domainId, pids, canViewHidden, false) : {};
+        // Access to the contest list is checked above; a hidden problem must still
+        // resolve for eligible contestants without becoming visible in the problem bank.
+        const pdict = canSeeProblems ? await ProblemModel.getList(domainId, pids, true, false) : {};
         const part = pick(queryOf(this, 'part'), ['overview', 'problems', 'board'], 'overview');
         const card = contestCard(tdoc);
         const paused = ContestModel.isPaused(tdoc, tsdoc);

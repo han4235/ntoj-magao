@@ -23,6 +23,7 @@ import domain from '../model/domain';
 import * as oplog from '../model/oplog';
 import problem, { ProblemDoc } from '../model/problem';
 import RecordModel from '../model/record';
+import solution from '../model/solution';
 import ScheduleModel from '../model/schedule';
 import system from '../model/system';
 import token from '../model/token';
@@ -456,9 +457,48 @@ class UserDetailHandler extends Handler {
         const tdocs = await ContestModel.getMulti(domainId, { docId: { $in: tsdocs.map((i) => i.docId) } })
             .project({ docId: 1, title: 1, rule: 1 }).sort({ _id: -1 }).toArray();
         const submitHeatmap = await RecordModel.getSubmitHeatmap(domainId, uid);
+        const favorites: { type: string, title: string, pid: number | string, sid?: string, starredAt: Date }[] = [];
+        if (isSelfProfile && this.user.hasPerm(PERM.PERM_VIEW_PROBLEM)) {
+            const [starredProblems, starredSolutions] = await Promise.all([
+                problem.getMultiStatus(domainId, { uid, star: true }).toArray(),
+                solution.getStarred(domainId, uid).toArray(),
+            ]);
+            const solutionDocs = starredSolutions.length
+                ? await solution.getByIds(domainId, starredSolutions.map((item) => item.docId)) : [];
+            const problemIds = [...new Set([
+                ...starredProblems.map((item) => item.docId),
+                ...solutionDocs.map((item) => item.parentId),
+            ])];
+            const problemDict = await problem.getList(domainId, problemIds, canViewHidden,
+                false, problem.PROJECTION_LIST, true);
+            for (const item of starredProblems) {
+                const pdoc = problemDict[item.docId];
+                if (pdoc) favorites.push({
+                    type: 'problem', title: pdoc.title, pid: pdoc.pid || pdoc.docId,
+                    starredAt: item.starredAt || item._id.getTimestamp(),
+                });
+            }
+            const solutionById = new Map(solutionDocs.map((item) => [String(item.docId), item]));
+            for (const item of starredSolutions) {
+                const sdoc = solutionById.get(String(item.docId));
+                if (!sdoc) continue;
+                const pdoc = problemDict[sdoc.parentId];
+                if (!pdoc) continue;
+                const accepted = pdocs.some((acceptedProblem) => acceptedProblem.docId === sdoc.parentId);
+                if (!this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_SOLUTION)
+                    && !(accepted && this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_SOLUTION_ACCEPT))) continue;
+                if (sdoc.top && !accepted && pdoc.owner !== uid
+                    && !this.user.hasPerm(PERM.PERM_EDIT_PROBLEM_SOLUTION)) continue;
+                favorites.push({
+                    type: 'solution', title: pdoc.title, pid: pdoc.pid || pdoc.docId,
+                    sid: String(sdoc.docId), starredAt: item.starredAt || item._id.getTimestamp(),
+                });
+            }
+            favorites.sort((a, b) => b.starredAt.getTime() - a.starredAt.getTime());
+        }
         this.response.template = 'user_detail.html';
         this.response.body = {
-            isSelfProfile, udoc, sdoc, pdocs, tags, tdocs, submitHeatmap,
+            isSelfProfile, udoc, sdoc, pdocs, tags, tdocs, submitHeatmap, favorites,
         };
         this.UiContext.extraTitleContent = udoc.uname;
     }

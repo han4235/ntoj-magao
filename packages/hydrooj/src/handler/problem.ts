@@ -1037,6 +1037,21 @@ export class ProblemSolutionHandler extends ProblemDetailHandler {
         this.back({ vote: psdoc.vote, user_vote: -1 });
     }
 
+    @param('psid', Types.ObjectId)
+    @param('star', Types.Boolean)
+    async postStarSolution(domainId: string, psid: ObjectId, star: boolean) {
+        if (this.psdoc?.status !== STATUS.STATUS_ACCEPTED
+            || !this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_SOLUTION_ACCEPT)) {
+            this.checkPerm(PERM.PERM_VIEW_PROBLEM_SOLUTION);
+        }
+        if (!this.user.hasPriv(PRIV.PRIV_USER_PROFILE)) throw new PermissionError(PERM.PERM_VIEW_PROBLEM_SOLUTION);
+        const psdoc = await solution.get(domainId, psid);
+        if (psdoc.parentId !== this.pdoc.docId) throw new SolutionNotFoundError(domainId, psid);
+        this.assertPinnedVisible(psdoc);
+        await solution.setStar(domainId, psid, this.user._id, star);
+        this.back({ star });
+    }
+
     // 置顶 / 取消置顶：一个入口来回切。鉴权用「编辑他人题解」——
     // 域内教师与管理员有这一位，学生没有，正好是要限定的两种角色，不必新增权限位。
     @param('psid', Types.ObjectId)

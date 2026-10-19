@@ -453,7 +453,9 @@ export class ProblemModel {
     }
 
     static setStar(domainId: string, pid: number, uid: number, star: boolean) {
-        return document.setStatus(domainId, document.TYPE_PROBLEM, pid, uid, { star });
+        return document.setStatus(domainId, document.TYPE_PROBLEM, pid, uid,
+            star ? { star, starredAt: new Date() } : { star },
+            star ? null : { starredAt: '' });
     }
 
     static canViewBy(pdoc: ProblemDoc, udoc: User) {

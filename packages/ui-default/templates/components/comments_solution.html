@@ -120,6 +120,13 @@
             <span class="icon icon-link"></span>
           </a>
         {% endif %}
+        {% if view == 'solution' and handler.user.hasPriv(PRIV.PRIV_USER_PROFILE) %}
+          <form method="post" class="dtoj-solution-star">
+            <input type="hidden" name="psid" value="{{ doc._id }}">
+            <input type="hidden" name="star" value="{{ 'false' if pssdict[doc._id].star else 'true' }}">
+            <button type="submit" name="operation" value="star_solution" class="dtoj-solution-star-btn{% if pssdict[doc._id].star %} is-on{% endif %}" aria-label="{{ '取消收藏题解' if pssdict[doc._id].star else '收藏题解' }}" title="{{ '取消收藏' if pssdict[doc._id].star else '收藏题解' }}"><span class="icon icon-{{ 'star' if pssdict[doc._id].star else 'star--outline' }}" aria-hidden="true"></span></button>
+          </form>
+        {% endif %}
         {% if handler.user.hasPerm(reply_post_perm) %}
           <a href="javascript:;" data-tooltip="{{ _('Reply') }}" data-op="reply" data-type="comment" 
             data-form="{{ {operation: reply_post_op, psid: doc._id}|json }}"

@@ -217,6 +217,7 @@ export interface ProblemStatusDoc extends StatusDocBase {
     score?: number;
     status?: number;
     star?: boolean;
+    starredAt?: Date;
 }
 
 export type RecordDoc = {

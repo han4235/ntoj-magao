@@ -15,6 +15,20 @@ class SolutionModel {
         return document.set(domainId, document.TYPE_PROBLEM_SOLUTION, psid, { top });
     }
 
+    static setStar(domainId: string, psid: ObjectId, uid: number, star: boolean) {
+        return document.setStatus(domainId, document.TYPE_PROBLEM_SOLUTION, psid, uid,
+            star ? { star, starredAt: new Date() } : { star },
+            star ? null : { starredAt: '' });
+    }
+
+    static getStarred(domainId: string, uid: number) {
+        return document.getMultiStatus(domainId, document.TYPE_PROBLEM_SOLUTION, { uid, star: true });
+    }
+
+    static getByIds(domainId: string, psids: ObjectId[]) {
+        return document.getMulti(domainId, document.TYPE_PROBLEM_SOLUTION, { docId: { $in: psids } }).toArray();
+    }
+
     static async get(domainId: string, psid: ObjectId) {
         const psdoc = await document.get(domainId, document.TYPE_PROBLEM_SOLUTION, psid);
         if (!psdoc) throw new SolutionNotFoundError(domainId, psid);
@@ -90,10 +104,10 @@ class SolutionModel {
     }
 
     static async getListStatus(domainId: string, psids: ObjectId[], uid: number) {
-        const result: Record<string, { docId: ObjectId, vote: number }> = {};
+        const result: Record<string, { docId: ObjectId, vote: number, star?: boolean }> = {};
         const res = await document.getMultiStatus(
             domainId, document.TYPE_PROBLEM_SOLUTION, { uid, docId: { $in: psids } },
-        ).project<any>({ docId: 1, vote: 1 }).toArray();
+        ).project<any>({ docId: 1, vote: 1, star: 1 }).toArray();
         for (const i of res) result[i.docId] = i;
         return result;
     }

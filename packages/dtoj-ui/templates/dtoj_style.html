@@ -1409,6 +1409,34 @@
   }
   .dtoj-user .section__tab-content { padding: 0; }
   .dtoj-user .section__tab-main { padding: 20px 22px 24px; }
+  .dtoj-favorites__head,
+  .dtoj-favorites__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 76px 130px 40px;
+    gap: 12px;
+    align-items: center;
+  }
+  .dtoj-favorites__head { padding: 4px 12px 12px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
+  .dtoj-favorites__row { min-height: 58px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .dtoj-favorites__row:last-child { border-bottom: 0; }
+  .dtoj-favorites__name { min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 650; text-decoration: none; }
+  .dtoj-favorites__name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dtoj-favorites__name .icon { color: var(--brand); font-size: 19px; flex: none; }
+  .dtoj-favorites__name:hover { color: var(--brand-deep); text-decoration: underline; }
+  .dtoj-favorites__kind, .dtoj-favorites__date { color: var(--muted); font-size: 13px; }
+  .dtoj-favorites__row form { margin: 0; }
+  .dtoj-favorites__remove, .dtoj-solution-star-btn { appearance: none; border: 0; background: transparent; cursor: pointer; padding: 7px; color: #bd7800; }
+  .dtoj-favorites__remove:hover, .dtoj-solution-star-btn:hover { color: #8e5900; }
+  .dtoj-favorites__remove:focus-visible, .dtoj-solution-star-btn:focus-visible, .dtoj-favorites__name:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+  .dtoj-problem-sub .dtoj-solution-star { display: inline; margin: 0; }
+  .dtoj-problem-sub .dtoj-solution-star-btn { font-size: 17px; line-height: 1; }
+  @media (max-width: 640px) {
+    .dtoj-favorites__head { display: none; }
+    .dtoj-favorites__row { grid-template-columns: minmax(0, 1fr) 40px; gap: 3px 8px; }
+    .dtoj-favorites__name { grid-column: 1; }
+    .dtoj-favorites__kind, .dtoj-favorites__date { grid-column: 1; margin-left: 29px; }
+    .dtoj-favorites__row form { grid-column: 2; grid-row: 1 / span 3; }
+  }
   .dtoj-submit-heatmap-wrap { padding: 0; }
   .dtoj-submit-heatmap {
     --hm-gap: clamp(2px, 0.28vw, 3px);

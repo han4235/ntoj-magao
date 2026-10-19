@@ -137,6 +137,38 @@
                     {% endif %}
                   </div>
                 </li>
+                {% if isSelfProfile %}
+                <li class="section__tab-item">
+                  <h1 class="section__tab-title">个人收藏</h1>
+                  <div class="section__tab-main">
+                    {% if not favorites.length %}
+                    <div class="dtoj-user-empty dtoj-user-empty--compact">
+                      <p>还没有收藏。打开题目或题解，点击星标即可在这里找到。</p>
+                    </div>
+                    {% else %}
+                    <div class="dtoj-favorites">
+                      <div class="dtoj-favorites__head" aria-hidden="true"><span>名称</span><span>类型</span><span>收藏时间</span><span></span></div>
+                      {% for item in favorites %}
+                      <div class="dtoj-favorites__row">
+                        <a class="dtoj-favorites__name" href="{% if item.type == 'solution' %}{{ url('problem_solution_detail', pid=item.pid, sid=item.sid) }}{% else %}{{ url('problem_detail', pid=item.pid) }}{% endif %}">
+                          <span class="icon icon-{{ 'book' if item.type == 'solution' else 'file' }}" aria-hidden="true"></span>
+                          <span>{{ item.pid }} · {{ item.title }}</span>
+                        </a>
+                        <span class="dtoj-favorites__kind">{{ '题解' if item.type == 'solution' else '题目' }}</span>
+                        <time class="dtoj-favorites__date" datetime="{{ item.starredAt.toISOString() }}">{{ datetimeSpan(item.starredAt)|safe }}</time>
+                        <form method="post" action="{% if item.type == 'solution' %}{{ url('problem_solution', pid=item.pid) }}{% else %}{{ url('problem_detail', pid=item.pid) }}{% endif %}">
+                          <input type="hidden" name="operation" value="{{ 'star_solution' if item.type == 'solution' else 'star' }}">
+                          {% if item.sid %}<input type="hidden" name="psid" value="{{ item.sid }}">{% endif %}
+                          <input type="hidden" name="star" value="false">
+                          <button type="submit" class="dtoj-favorites__remove" aria-label="取消收藏 {{ item.title }}" title="取消收藏"><span class="icon icon-star" aria-hidden="true"></span></button>
+                        </form>
+                      </div>
+                      {% endfor %}
+                    </div>
+                    {% endif %}
+                  </div>
+                </li>
+                {% endif %}
                 {% for page in findSubModule('partials/user_detail/') %}{% include page %}{% endfor %}
                 <li class="section__tab-item">
                   <h1 class="section__tab-title">{{ _('Submissions') }}</h1>

@@ -464,6 +464,19 @@
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
+  .dtoj-hw-view .dtoj-hw-qa-delete { flex: 0 0 auto; margin: 0 0 0 4px; }
+  .dtoj-hw-view .dtoj-hw-qa-delete button {
+    padding: 2px 5px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b42318;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .dtoj-hw-view .dtoj-hw-qa-delete button:hover { background: #fff0ef; }
+  .dtoj-hw-view .dtoj-hw-qa-delete button:focus-visible { outline: 2px solid #b42318; outline-offset: 2px; }
   .dtoj-hw-view .dtoj-hw-qa-body {
     margin: 8px 0 0;
     color: var(--ink);
@@ -882,6 +895,13 @@
                     <span class="dtoj-hw-qa-tag">{{ q.subjectLabel }}</span>
                     {% if q.isPublic %}<span class="dtoj-hw-qa-tag is-pub">公开</span>{% endif %}
                     <span class="dtoj-hw-qa-at">{{ datetimeSpan(q._id)|safe }}</span>
+                    {% if hwCanManage %}
+                    <form class="dtoj-hw-qa-delete" method="POST"
+                          action="{{ url('homework_ask_delete', tid=tdoc.docId, did=q._id) }}"
+                          onsubmit='return confirm("删除这条提问会同时删除它的全部回复，确定继续吗？")'>
+                      <button type="submit" aria-label="删除整条提问及回复">删除提问</button>
+                    </form>
+                    {% endif %}
                   </div>
                   <p class="dtoj-hw-qa-body">{{ q.content }}</p>
                   {% for r in q.reply or [] %}
@@ -889,6 +909,14 @@
                     <div class="dtoj-hw-qa-head">
                       {% if hwQuestionUsers[r.owner] %}{{ user.render_inline(hwQuestionUsers[r.owner], badge=false) }}{% else %}#{{ r.owner }}{% endif %}
                       {% if r.isTeacher %}<span class="dtoj-hw-qa-tag">老师</span>{% endif %}
+                      {% if hwCanManage %}
+                      <form class="dtoj-hw-qa-delete" method="POST"
+                            action="{{ url('homework_ask_delete', tid=tdoc.docId, did=q._id) }}"
+                            onsubmit='return confirm("确定删除这条回复吗？")'>
+                        <input type="hidden" name="replyId" value="{{ r._id }}">
+                        <button type="submit" aria-label="删除这条回复">删除</button>
+                      </form>
+                      {% endif %}
                     </div>
                     <p class="dtoj-hw-qa-body">{{ r.content }}</p>
                   </div>

@@ -13,7 +13,7 @@ import {
     canViewPracticeRecordDetail,
     canViewRecordSourceCode,
 } from './recordAccess';
-import { DtojDataHandler, dropEarlierRoutes, queryString } from 'dtoj-ui';
+import { DtojDataHandler, dropEarlierRoutes, queryString, studentNotesForUsers } from 'dtoj-ui';
 import { buildCaseFileUrlMap, buildCaseLabelMap, buildDtojRecordDetailView, canViewProblemTestdataFiles } from './dtojRecordDetail';
 
 function memoryText(kb: number) {
@@ -103,11 +103,12 @@ class DtojRecordHandler extends DtojDataHandler {
                 'record',
             );
         const canViewHidden = this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || this.user._id;
-        const [udict, pdict] = await Promise.all([
+        const [udict, pdict, studentNotes] = await Promise.all([
             UserModel.getList(domainId, rdocs.map((rdoc) => rdoc.uid)),
             this.user.hasPerm(PERM.PERM_VIEW_PROBLEM)
                 ? ProblemModel.getList(domainId, rdocs.map((rdoc) => rdoc.pid), canViewHidden, false, ProblemModel.PROJECTION_LIST)
                 : {},
+            canViewAllRecords ? studentNotesForUsers(domainId, rdocs.map((rdoc) => rdoc.uid)) : {},
         ]);
         const running = new Set([STATUS.STATUS_JUDGING, STATUS.STATUS_COMPILING, STATUS.STATUS_FETCHED]);
         const records = rdocs.map((rdoc) => {
@@ -126,6 +127,7 @@ class DtojRecordHandler extends DtojDataHandler {
                 problem: visible ? pdoc.title : '*',
                 problemLink: visible ? (pdoc.pid || pdoc.docId) : '',
                 user: udoc?.uname || '—',
+                userNote: studentNotes[rdoc.uid] || '',
                 uid: rdoc.uid,
                 submittedAt: rdoc._id,
             };

@@ -19,10 +19,73 @@ const page = new NamedPage('domain_user', () => {
     $('.domain-users tbody tr[data-uid]').each((_, el) => {
       const $row = $(el);
       const uid = String($row.attr('data-uid') || '');
-      const name = $row.find('.col--user').text().toLowerCase();
+      const note = $row.find('[data-note-value]').text();
+      const name = `${$row.find('.col--user').text()} ${note}`.toLowerCase();
       const hit = !q || uid.includes(q) || name.includes(q);
       $row.toggle(hit);
     });
+  }
+
+  function setInlineStudentNote(row, note) {
+    const cell = row.querySelector('.col--user');
+    if (!cell) return;
+    let inline = cell.querySelector('[data-student-note-inline]');
+    if (!note) {
+      inline?.remove();
+      return;
+    }
+    if (!inline) {
+      inline = document.createElement('span');
+      inline.className = 'domain-student-note__inline';
+      inline.dataset.studentNoteInline = '';
+    }
+    inline.textContent = `（${note}）`;
+    const notJoined = cell.querySelector('.text-orange');
+    cell.insertBefore(inline, notJoined || null);
+  }
+
+  async function handleStudentNoteAction(ev) {
+    const button = ev.currentTarget;
+    const cell = button.closest('[data-student-note-cell]');
+    const row = button.closest('tr[data-uid]');
+    if (!cell || !row) return;
+    const view = cell.querySelector('.domain-student-note__view');
+    const editor = cell.querySelector('.domain-student-note__editor');
+    const input = cell.querySelector('[data-note-input]');
+    const action = button.dataset.noteAction;
+    if (action === 'edit') {
+      input.value = row.dataset.studentNote || '';
+      view.hidden = true;
+      editor.hidden = false;
+      input.focus();
+      return;
+    }
+    if (action === 'cancel') {
+      input.value = row.dataset.studentNote || '';
+      editor.hidden = true;
+      view.hidden = false;
+      return;
+    }
+    if (action !== 'save') return;
+    button.disabled = true;
+    try {
+      const result = await request.post(UiContext.studentNoteUrl, {
+        uid: Number(row.dataset.uid),
+        note: input.value,
+      });
+      const note = String(result?.note || '');
+      row.dataset.studentNote = note;
+      input.value = note;
+      cell.querySelector('[data-note-value]').textContent = note || '—';
+      setInlineStudentNote(row, note);
+      editor.hidden = true;
+      view.hidden = false;
+      filterDomainUsers();
+    } catch (error) {
+      Notification.error(error.message);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function exitRoleEdit($row, revert = false) {
@@ -282,6 +345,15 @@ ${i18n('Accounts will be permanently deleted and cannot be restored.')}`))) retu
   });
   $('.domain-users').on('click', '.domain-user-role__btn-cancel', (ev) => {
     exitRoleEdit($(ev.currentTarget).closest('tr'), true);
+  });
+  $('.domain-users').on('click', '[data-note-action]', (ev) => handleStudentNoteAction(ev));
+  $('.domain-users').on('keydown', '[data-note-input]', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      $(ev.currentTarget).closest('[data-student-note-cell]').find('[data-note-action="save"]').trigger('click');
+    } else if (ev.key === 'Escape') {
+      $(ev.currentTarget).closest('[data-student-note-cell]').find('[data-note-action="cancel"]').trigger('click');
+    }
   });
   $('.domain-users').on('change', 'select[name="role"]', (ev) => handleChangeUserRole(ev));
   $('.domain-users').on('click', '.domain-user-init-pwd', (ev) => handleClickInitPassword(ev));

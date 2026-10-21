@@ -173,6 +173,7 @@ class DomainUserHandler extends ManageHandler {
                         user: 1,
                         role: 1,
                         join: 1,
+                        studentNote: 1,
                         ...(this.user.hasPerm(PERM.PERM_VIEW_USER_PRIVATE_INFO) ? { displayName: 1 } : {}),
                     },
                 },
@@ -217,6 +218,7 @@ class DomainUserHandler extends ManageHandler {
         const udocs = visibleUsers.slice((page - 1) * DOMAIN_USER_PAGE_SIZE, page * DOMAIN_USER_PAGE_SIZE);
         this.response.body = {
             roles, rudocs, domain: this.domain, udocs, page, upcount, ucount, sortRole,
+            studentRole: system.get('default.userRole') || '学生',
         };
     }
 

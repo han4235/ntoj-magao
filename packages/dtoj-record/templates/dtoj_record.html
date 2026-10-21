@@ -3,6 +3,9 @@
 {% import "components/paginator.html" as paginator with context %}
 {% block content %}
 {% include "dtoj_style.html" %}
+<style>
+  .dtoj-record-list-page .dtoj-record-user-note { margin-left: 4px; color: var(--muted, #6b7280); font-size: 0.9em; }
+</style>
 <div class="row">
   <div class="medium-12 columns dtoj-page dtoj-home dtoj-record-list-page">
     <div class="dtoj-shell">
@@ -80,7 +83,7 @@
           <tbody>
             {% for row in records %}
             <tr>
-              <td>{{ row.user }}</td>
+              <td>{{ row.user }}{% if row.userNote %}<span class="dtoj-record-user-note">（{{ row.userNote }}）</span>{% endif %}</td>
               <td>
                 <span class="dtoj-status" data-status="{{ row.code }}">
                   <a href="{{ url('record_detail', rid=row.id) }}">{{ row.statusKey }}</a>

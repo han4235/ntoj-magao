@@ -131,7 +131,7 @@
     white-space: nowrap;
   }
   .dtoj-help-nav-col a:hover { background: #f4f7fb; }
-  /* 窗口不够宽时，navigation.page.js 会把尾部的项（社区、帮助…）整块搬进「更多」下拉里。
+  /* 窗口不够宽时，navigation.page.js 会把尾部的项（训练、社区、帮助…）整块搬进「更多」下拉里。
      浮动面板在那儿没有赖以定位的容器，会糊到下拉外面去，改成随流展开的子目录。 */
   #menu-nav-more { min-width: 220px; }
   #menu-nav-more .dtoj-nav-drop-btn {
@@ -217,9 +217,27 @@
         <a href="/"><img class="nav__logo" src="{{ ctx.setting.get('ui-default.nav_logo_dark') }}"></a>
       </li>
       {%- for item in overrideNav|default(ui.getNodes('Nav')) -%}{% if item.checker(handler) %}
-        {% if item.name == 'dtoj_community' %}
-        <li class="nav__list-item dtoj-nav-drop{% if page_name.startsWith('dtoj_community') or page_name.startsWith('dtoj_discuss') or page_name.startsWith('dtoj_shop') %} nav--active{% endif %}">
-          <button type="button" class="nav__item dtoj-nav-drop-btn{% if page_name.startsWith('dtoj_community') or page_name.startsWith('dtoj_discuss') or page_name.startsWith('dtoj_shop') %} nav--active{% endif %}" aria-expanded="false" aria-controls="dtoj-nav-community">
+        {% if item.name == 'training_main' %}
+        <li class="nav__list-item dtoj-nav-drop{% if page_name.startsWith('dtoj_training') or page_name.startsWith('homework') or page_name.startsWith('dtoj_contest') %} nav--active{% endif %}">
+          <button type="button" class="nav__item dtoj-nav-drop-btn{% if page_name.startsWith('dtoj_training') or page_name.startsWith('homework') or page_name.startsWith('dtoj_contest') %} nav--active{% endif %}" aria-expanded="false" aria-controls="dtoj-nav-training">
+            训练 <span class="dtoj-nav-caret" aria-hidden="true"></span>
+          </button>
+          <div class="dtoj-nav-panel" id="dtoj-nav-training" hidden>
+            <p class="dtoj-nav-space">训练与比赛</p>
+            <a class="dtoj-nav-link{% if page_name.startsWith('dtoj_training') %} is-on{% endif %}" href="{{ url('training_main') }}">
+              <strong>训练</strong><small>浏览课程与练习</small>
+            </a>
+            <a class="dtoj-nav-link{% if page_name.startsWith('homework') %} is-on{% endif %}" href="{{ url('homework_main') }}">
+              <strong>作业</strong><small>查看与完成作业</small>
+            </a>
+            <a class="dtoj-nav-link{% if page_name.startsWith('dtoj_contest') %} is-on{% endif %}" href="{{ url('contest_main') }}">
+              <strong>比赛</strong><small>参加比赛与查看成绩</small>
+            </a>
+          </div>
+        </li>
+        {% elif item.name == 'dtoj_community' %}
+        <li class="nav__list-item dtoj-nav-drop{% if page_name.startsWith('dtoj_community') or page_name.startsWith('dtoj_discuss') or page_name.startsWith('dtoj_shop') or page_name.startsWith('dtoj_rank') %} nav--active{% endif %}">
+          <button type="button" class="nav__item dtoj-nav-drop-btn{% if page_name.startsWith('dtoj_community') or page_name.startsWith('dtoj_discuss') or page_name.startsWith('dtoj_shop') or page_name.startsWith('dtoj_rank') %} nav--active{% endif %}" aria-expanded="false" aria-controls="dtoj-nav-community">
             社区 <span class="dtoj-nav-caret" aria-hidden="true"></span>
           </button>
           <div class="dtoj-nav-panel" id="dtoj-nav-community" hidden>
@@ -230,12 +248,15 @@
             <a class="dtoj-nav-link{% if page_name.startsWith('dtoj_discuss') %} is-on{% endif %}" href="{{ url('discussion_main') }}">
               <strong>讨论</strong><small>交流题目与解法</small>
             </a>
+            <a class="dtoj-nav-link{% if page_name.startsWith('dtoj_rank') %} is-on{% endif %}" href="{{ url('dtoj_rank') }}">
+              <strong>等级分</strong><small>查看等级分排名</small>
+            </a>
             <a class="dtoj-nav-link{% if page_name.startsWith('dtoj_shop') %} is-on{% endif %}" href="{{ url('dtoj_shop') }}">
               <strong>神秘商店</strong><small>查看商品与订单</small>
             </a>
           </div>
         </li>
-        {% elif item.name != 'discussion_main' and item.name != 'dtoj_shop' %}
+        {% elif item.name != 'homework_main' and item.name != 'contest_main' and item.name != 'discussion_main' and item.name != 'dtoj_shop' %}
         {{ nav_item(item) }}
         {% endif %}
       {% endif %}{%- endfor -%}
@@ -430,7 +451,7 @@
 <nav class="nav--shadow"></nav>
 <script>
   (function () {
-    // 顶栏有两处同类下拉（社区、帮助），而且窗口一窄，「更多」逻辑会把节点搬到别处去，
+    // 顶栏有三处同类下拉（训练、社区、帮助），而且窗口一窄，「更多」逻辑会把节点搬到别处去，
     // 所以不绑在按钮上，改成绑在 document 上认人：节点搬到哪儿，这套逻辑都还认得它。
     function parts(drop) {
       return {
@@ -453,7 +474,7 @@
     document.addEventListener('click', function (event) {
       var btn = event.target.closest && event.target.closest('.dtoj-nav-drop-btn');
       if (btn) {
-        // 同时只留一个展开，两个面板叠在一起没法看
+        // 同时只留一个展开，多个面板叠在一起没法看
         var drop = btn.parentElement;
         closeAll(drop);
         setOpen(drop, !drop.classList.contains('is-open'));

@@ -620,6 +620,38 @@ class DtojHomeworkReplyHandler extends DtojDataHandler {
     }
 }
 
+/** 作业负责人或管理员删除答疑提问/回复；replyId 为空时删除整条提问及其回复。 */
+class DtojHomeworkDeleteMessageHandler extends DtojDataHandler {
+    @param('tid', Types.ObjectId)
+    @param('did', Types.ObjectId)
+    @param('replyId', Types.ObjectId, true)
+    async post(domainId: string, tid: ObjectId, did: ObjectId, replyId?: ObjectId) {
+        const tdoc = await ContestModel.get(domainId, tid);
+        if (tdoc?.rule !== 'homework') throw new ContestNotFoundError(domainId, tid);
+        if (!canManageHomework(this, tdoc)) throw new ForbiddenError(PERM.PERM_EDIT_HOMEWORK);
+
+        const qdoc = await DocumentModel.get(domainId, DocumentModel.TYPE_CONTEST_CLARIFICATION, did);
+        if (!qdoc || qdoc.parentType !== DocumentModel.TYPE_CONTEST || String(qdoc.parentId) !== String(tid)) {
+            throw new ContestNotFoundError(domainId, tid);
+        }
+
+        if (replyId) {
+            const exists = (qdoc.reply || []).some((reply: any) => String(reply._id) === String(replyId));
+            if (!exists) throw new ValidationError('replyId');
+            await DocumentModel.deleteSub(domainId, DocumentModel.TYPE_CONTEST_CLARIFICATION, did, 'reply', replyId);
+            await OplogModel.log(this, 'dtoj.homeworkQA.deleteReply', {
+                domainId, tid: String(tid), did: String(did), replyId: String(replyId),
+            });
+        } else {
+            await DocumentModel.deleteOne(domainId, DocumentModel.TYPE_CONTEST_CLARIFICATION, did);
+            await OplogModel.log(this, 'dtoj.homeworkQA.deleteQuestion', {
+                domainId, tid: String(tid), did: String(did),
+            });
+        }
+        this.response.redirect = this.url('homework_detail', { tid });
+    }
+}
+
 /**
  * 自助加入分组。
  *
@@ -1187,4 +1219,5 @@ export async function apply(ctx: Context) {
     // 作业答疑的两条写入口，见 DtojHomeworkAskHandler / DtojHomeworkReplyHandler
     ctx.Route('homework_ask', '/homework/:tid/ask', DtojHomeworkAskHandler, PERM.PERM_VIEW_HOMEWORK);
     ctx.Route('homework_ask_reply', '/homework/:tid/ask/:did/reply', DtojHomeworkReplyHandler, PERM.PERM_VIEW_HOMEWORK);
+    ctx.Route('homework_ask_delete', '/homework/:tid/ask/:did/delete', DtojHomeworkDeleteMessageHandler, PERM.PERM_VIEW_HOMEWORK);
 }

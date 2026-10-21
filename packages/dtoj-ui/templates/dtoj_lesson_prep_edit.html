@@ -1,0 +1,142 @@
+{% set page_name = 'dtoj_lesson_prep_edit' %}
+{% extends "layout/basic.html" %}
+{% block content %}
+{% include "dtoj_style.html" %}
+<style>
+  .dtoj-prep-edit { max-width: 850px; margin: 0 auto; }
+  .dtoj-prep-edit h1 {
+    margin: 0;
+    color: var(--ink);
+    font: 700 clamp(32px, 4vw, 48px)/1.16 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
+    letter-spacing: -0.045em;
+  }
+  .dtoj-prep-edit .lead { max-width: 65ch; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+  .dtoj-prep-form { padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: #fff; box-shadow: 0 16px 40px rgba(28, 39, 64, 0.07); }
+  .dtoj-prep-form label { display: flex; flex-direction: column; gap: 9px; min-width: 0; margin-bottom: 22px; color: var(--ink); font-size: 14px; font-weight: 700; }
+  .dtoj-prep-form input, .dtoj-prep-form select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #fff;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+    caret-color: var(--accent);
+    transition: border-color 0.18s ease-out, box-shadow 0.18s ease-out;
+  }
+  .dtoj-prep-form input::placeholder { color: #5f6b7a; opacity: 1; }
+  .dtoj-prep-form input::selection { background: #d5e4f0; color: var(--ink); }
+  .dtoj-prep-form input:hover, .dtoj-prep-form select:hover { border-color: #9aabb9; }
+  .dtoj-prep-form input:focus-visible, .dtoj-prep-form select:focus-visible {
+    border-color: var(--accent);
+    outline: 3px solid rgba(47, 93, 130, 0.22);
+    outline-offset: 1px;
+  }
+  .dtoj-prep-form small { color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.65; }
+  .dtoj-prep-form label[hidden] { display: none; }
+  .dtoj-prep-form .times { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dtoj-prep-form .times label { padding: 14px; border-radius: 16px; background: #f4f7fb; }
+  .dtoj-prep-form .times input { font-variant-numeric: tabular-nums; }
+  .dtoj-prep-form .times small { margin-top: -2px; }
+  .dtoj-prep-form .autocomplete-container {
+    box-sizing: border-box;
+    min-height: 54px;
+    margin: 0 !important;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #fff;
+    transition: border-color 0.18s ease-out, box-shadow 0.18s ease-out;
+  }
+  .dtoj-prep-form .autocomplete-container:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47, 93, 130, 0.16); }
+  .dtoj-prep-form .autocomplete-wrapper { min-height: 42px; border: 0; background: transparent; }
+  .dtoj-prep-form .autocomplete-wrapper input { min-height: 42px; border: 0; outline: 0; box-shadow: none; font-size: 14px; }
+  .dtoj-prep-form .autocomplete-wrapper input:hover,
+  .dtoj-prep-form .autocomplete-wrapper input:focus-visible { border: 0; outline: 0; box-shadow: none; }
+  .dtoj-prep-form .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; margin-top: 6px; }
+  .dtoj-prep-form .actions button {
+    min-height: 48px;
+    padding: 0 22px;
+    border: 1px solid var(--accent);
+    border-radius: 11px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease-out, box-shadow 0.18s ease-out;
+  }
+  .dtoj-prep-form .actions button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(28, 39, 64, 0.14); }
+  .dtoj-prep-form .actions button:focus-visible,
+  .dtoj-prep-form .actions a:focus-visible,
+  .dtoj-prep-delete button:focus-visible { outline: 3px solid rgba(47, 93, 130, 0.3); outline-offset: 3px; }
+  .dtoj-prep-form .actions a { color: var(--accent); font-size: 14px; font-weight: 700; text-decoration: none; text-underline-offset: 3px; }
+  .dtoj-prep-form .actions a:hover { text-decoration: underline; }
+  .dtoj-prep-delete { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); text-align: right; }
+  .dtoj-prep-delete button { padding: 6px 0; border: 0; background: transparent; color: #8a1f1f; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-underline-offset: 3px; }
+  .dtoj-prep-delete button:hover { text-decoration: underline; }
+  @media (max-width: 600px) {
+    .dtoj-prep-form { padding: 20px; }
+    .dtoj-prep-form .times { grid-template-columns: 1fr; gap: 0; }
+    .dtoj-prep-form .times label { padding: 12px; }
+    .dtoj-prep-form .actions { align-items: stretch; flex-direction: column; gap: 12px; }
+    .dtoj-prep-form .actions button { width: 100%; }
+    .dtoj-prep-form .actions a { min-height: 40px; text-align: center; }
+  }
+</style>
+<div class="row">
+  <div class="medium-12 columns dtoj-page dtoj-home">
+  <div class="dtoj-shell dtoj-prep-edit">
+  <header><h1>{% if lesson %}编辑课时{% else %}新建课时{% endif %}</h1><p class="lead">按北京时间安排一节课，选择题库题目或训练课程章节。开始时间到后，学生会在所属小组的作业页看到课堂练习。</p></header>
+  <form class="dtoj-prep-form" method="post" action="{% if lesson %}{{ url('dtoj_lesson_prep_edit', id=lesson.id) }}{% else %}{{ url('dtoj_lesson_prep_new') }}{% endif %}">
+    <label>课时名称<input name="title" type="text" maxlength="100" required value="{{ lesson.title if lesson else '' }}" placeholder="例如：循环结构 · 第 1 课"></label>
+    <label>班级（分组）<select name="group" required><option value="">请选择班级</option>{% for group in groups %}<option value="{{ group }}"{% if lesson and group == lesson.group %} selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
+    <div class="times">
+      <label>开始时间<input name="startAt" type="datetime-local" required value="{{ lesson.startAt if lesson else '' }}"><small>北京时间</small></label>
+      <label>结束时间<input name="endAt" type="datetime-local" required value="{{ lesson.endAt if lesson else '' }}"><small>需晚于开始时间</small></label>
+    </div>
+    <label>题单来源
+      <select name="trainingChapter" data-training-chapter>
+        <option value="">从题库手动选题</option>
+        {% for option in trainingOptions %}<option value="{{ option.value }}"{% if lesson and lesson.trainingChapter == option.value %} selected{% endif %}>{{ option.title }}（{{ option.count }} 题）</option>{% endfor %}
+      </select>
+      <small>选择训练课程章节后，本节题单直接使用该章题目；课堂开始时，学生会自动加入这门课程，之后可继续学习。</small>
+    </label>
+    <label data-manual-pids>本节题单<input class="dtoj-pids" name="pids" type="text" required value="{{ lesson.pids if lesson else '' }}" placeholder="输入题号或标题搜索"><small>手动选题时最多 50 道；选择训练章节后，此项由章节题单替代。</small></label>
+    <div class="actions"><button type="submit">保存课时</button><a href="{{ url('dtoj_lesson_prep') }}">返回备课</a></div>
+  </form>
+  {% if lesson %}<form class="dtoj-prep-delete" method="post" action="{{ url('dtoj_lesson_prep_delete', id=lesson.id) }}" onsubmit="return confirm('确定删除这节备课？此操作无法撤销。')"><button type="submit">删除这节备课</button></form>{% endif %}
+  </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var source = document.querySelector('[data-training-chapter]');
+    var manual = document.querySelector('[data-manual-pids]');
+    var pids = manual && manual.querySelector('input[name="pids"]');
+    if (!source || !manual || !pids) return;
+    function sync() {
+      var fromCourse = !!source.value;
+      manual.hidden = fromCourse;
+      pids.required = !fromCourse;
+      pids.disabled = fromCourse;
+    }
+    source.addEventListener('change', sync);
+    sync();
+  }());
+  (function waitForPicker(tries) {
+    var api = window.HydroExports;
+    var input = document.querySelector('.dtoj-prep-form .dtoj-pids');
+    if (api && api.ProblemSelectAutoComplete && api.$ && input) {
+      api.ProblemSelectAutoComplete.getOrConstruct(api.$(input), { multi: true, clearDefaultValue: false });
+      return;
+    }
+    if (tries < 200) window.setTimeout(function () { waitForPicker(tries + 1); }, 50);
+  }(0));
+</script>
+{% endblock %}

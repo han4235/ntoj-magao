@@ -14,187 +14,172 @@
     - [name="calendar_entry"]   —— 月历挂载点，只在有作业时才渲染
 #}
 <style>
-  .dtoj-hw-sheet { padding: 0; overflow: hidden; border-radius: 20px; box-shadow: 0 16px 40px rgba(28, 39, 64, 0.07); }
+  .dtoj-classroom { margin-bottom: 0; }
+  .dtoj-classroom-head,
+  .dtoj-hw-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 0; margin-bottom: 14px; }
+  .dtoj-classroom-head h2,
+  .dtoj-hw-section-head h2 { margin: 0; color: var(--ink); font: 800 20px/1.4 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif; letter-spacing: -0.03em; }
+  .dtoj-classroom-head p,
+  .dtoj-hw-section-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .dtoj-classroom-count { color: var(--muted); font-size: 12px; font-weight: 700; }
+  .dtoj-classroom-list,
+  .dtoj-hw-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 1180px) {
+    .dtoj-classroom-list,
+    .dtoj-hw-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (max-width: 980px) {
+    .dtoj-classroom-list,
+    .dtoj-hw-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 680px) {
+    .dtoj-classroom-list,
+    .dtoj-hw-list { grid-template-columns: 1fr; }
+  }
+  .dtoj-classroom-item,
+  .dtoj-hw-row { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid rgba(30, 41, 59, 0.08); border-radius: 14px; background: #fff; box-shadow: 0 8px 22px rgba(28, 39, 64, 0.08); transition: transform 0.18s ease-out, box-shadow 0.18s ease-out; }
+  .dtoj-classroom-item:hover,
+  .dtoj-hw-row:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(28, 39, 64, 0.12); }
+  .dtoj-classroom-card-head,
+  .dtoj-hw-card-head { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; min-height: 92px; padding: 10px 12px 11px; overflow: hidden; color: #fff; background: linear-gradient(160deg, #1e1b4b 0%, #312e81 46%, #1e40af 100%); }
+  .dtoj-classroom-item:nth-child(3n+2) .dtoj-classroom-card-head,
+  .dtoj-hw-row:nth-child(3n+2) .dtoj-hw-card-head { background: linear-gradient(160deg, #042f2e 0%, #115e59 50%, #0f766e 100%); }
+  .dtoj-classroom-item:nth-child(3n) .dtoj-classroom-card-head,
+  .dtoj-hw-row:nth-child(3n) .dtoj-hw-card-head { background: linear-gradient(160deg, #0f172a 0%, #1e3a8a 54%, #1d4ed8 100%); }
+  .dtoj-classroom-lines,
+  .dtoj-hw-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .dtoj-classroom-lines path,
+  .dtoj-hw-lines path { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; }
+  .dtoj-classroom-card-head > :not(.dtoj-classroom-lines),
+  .dtoj-hw-card-head > :not(.dtoj-hw-lines) { position: relative; z-index: 1; }
+  .dtoj-classroom-title { grid-column: 1; grid-row: 2; margin: 0; color: #fff; font: 800 17px/1.35 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  .dtoj-classroom-label { grid-column: 1; grid-row: 1; justify-self: start; max-width: 100%; overflow: hidden; padding: 2px 8px; border: 1px solid rgba(255,255,255,.55); border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+  .dtoj-classroom-card-count { grid-column: 2; grid-row: 1; margin-top: 2px; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .dtoj-classroom-card-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-height: 190px; padding: 9px 12px 8px; }
+  .dtoj-classroom-time,
+  .dtoj-hw-time { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: #f4f7fb; }
+  .dtoj-classroom-time-point,
+  .dtoj-hw-time-point { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dtoj-classroom-time-point span,
+  .dtoj-hw-time-point span { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .dtoj-classroom-time-point time,
+  .dtoj-hw-time-point time { min-width: 0; color: var(--ink); font-size: 11px; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; text-align: right; }
+  .dtoj-classroom-problems { margin: 2px 0 0; }
+  .dtoj-classroom-problems-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .dtoj-classroom-problems-head h3,
+  .dtoj-hw-problems > span { display: block; margin: 0; color: var(--ink); font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
+  .dtoj-classroom-problems-head span { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .dtoj-classroom-problems ol,
+  .dtoj-hw-problem-list { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+  .dtoj-classroom-problems li,
+  .dtoj-hw-problem-list li { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
+  .dtoj-classroom-problem-n,
+  .dtoj-hw-problem-n { flex: none; color: var(--brand-deep); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+  .dtoj-classroom-problems li > a,
+  .dtoj-classroom-problems li > span:not(.dtoj-classroom-problem-n),
+  .dtoj-hw-problem-list li > span:not(.dtoj-hw-problem-n) { min-width: 0; overflow: hidden; color: #3e4c63; font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+  .dtoj-classroom-problems li > a { text-decoration: none; text-underline-offset: 3px; }
+  .dtoj-classroom-problems a:hover { text-decoration: underline; }
+  .dtoj-classroom-problems a:focus-visible { outline: 2px solid var(--brand-deep); outline-offset: 3px; border-radius: 2px; }
+  .dtoj-classroom-course { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); color: #3e4c63; font-size: 12px; }
+  .dtoj-classroom-course a { display: inline-flex; align-items: center; gap: 3px; color: var(--brand-deep); font-size: 12px; font-weight: 700; text-decoration: none; }
+  .dtoj-classroom-course a:hover { color: var(--brand); }
+  .dtoj-classroom-course a:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+  .dtoj-classroom-empty { margin: 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--muted); font-size: 13px; line-height: 1.8; }
+  .dtoj-hw-section-head { align-items: flex-start; }
 
-  /* 筛选条 */
-  /* .dtoj-sheet 默认 overflow:auto，会把小组面板裁在卡片里，这里放开 */
-  .dtoj-hw-page .dtoj-hw-filter { overflow: visible; }
-  .dtoj-hw-page .dtoj-hw-filter .dtoj-fields {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr) minmax(0, 1.8fr);
-  }
-  /* 管理员多一格「教师」，四列重排 */
-  .dtoj-hw-page .dtoj-hw-filter .dtoj-fields.has-teacher {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.5fr);
-  }
-  /* 小组多选：外层是 label 的替身，样式跟旁边的输入框对齐 */
-  .dtoj-hw-page .dtoj-hw-filter .dtoj-hw-field {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .dtoj-hw-multi { position: relative; font-weight: 400; }
-  .dtoj-hw-multi-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-    margin: 0;
-    text-align: left;
-    color: var(--ink);
-    font-size: 14px;
-    font-weight: 400;
-    cursor: pointer;
-  }
-  .dtoj-hw-multi-text {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .dtoj-hw-multi-caret {
-    flex: none;
-    width: 7px;
-    height: 7px;
-    margin-top: -4px;
-    border-right: 1.6px solid currentcolor;
-    border-bottom: 1.6px solid currentcolor;
-    transform: rotate(45deg);
-    opacity: 0.55;
-    transition: transform 0.16s ease;
-  }
-  .dtoj-hw-multi.is-open .dtoj-hw-multi-caret { margin-top: 3px; transform: rotate(-135deg); }
-  .dtoj-hw-multi-panel {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    max-height: 300px;
-    overflow: auto;
-    padding: 6px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-  }
-  .dtoj-hw-multi-panel[hidden] { display: none; }
-  .dtoj-hw-multi-panel label {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 9px;
-    border-radius: 8px;
-    color: var(--ink);
-    font-size: 13px;
-    font-weight: 400;
-    cursor: pointer;
-  }
-  .dtoj-hw-multi-panel label:hover { background: #f2f6fd; }
-  .dtoj-hw-multi-panel input { flex: none; margin: 0; }
-  .dtoj-hw-multi-panel label > span {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .dtoj-hw-multi-panel em {
-    flex: none;
-    margin-left: auto;
-    color: var(--muted);
-    font-size: 11px;
-    font-style: normal;
-  }
-  .dtoj-hw-multi-all { border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; margin-bottom: 4px; }
-  .dtoj-hw-multi-item[hidden] { display: none; }
-  .dtoj-hw-multi-empty {
-    margin: 6px 9px 8px;
-    color: var(--muted);
-    font-size: 12px;
-  }
-  /* 时间范围：两个日期并排，中间一个短横，占住原来「查看」那格 */
+  /* 筛选控件沿用训练页的标签行与搜索行，不再嵌套白色面板 */
+  .dtoj-hw-page form.dtoj-hw-filter.dtoj-sheet { margin-bottom: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+  .dtoj-hw-search-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+  .dtoj-hw-page form.dtoj-sheet-pad .dtoj-hw-search-row .dtoj-go { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: auto; min-height: 40px; height: 40px; margin: 0; padding: 0 18px; border: 0; border-radius: 10px; color: #fff; background: var(--brand); box-shadow: none; font-family: inherit; font-size: 14px; font-weight: 800; line-height: 1; text-decoration: none; cursor: pointer; }
+  .dtoj-hw-page form.dtoj-sheet-pad .dtoj-hw-search-row button.dtoj-go:hover { background: var(--brand-deep); }
+  .dtoj-hw-page form.dtoj-sheet-pad .dtoj-hw-search-row .dtoj-hw-new { margin-left: 0; border: 0; color: #fff; background: var(--brand); }
+  .dtoj-hw-page .dtoj-hw-filter .dtoj-fields { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; border: 0; }
+  .dtoj-hw-filter-tags { display: grid; gap: 12px; }
+  .dtoj-hw-tag-row { display: flex; align-items: flex-start; gap: 16px; }
+  .dtoj-hw-tag-label { display: flex; flex: 0 0 auto; align-items: center; min-height: 34px; padding: 0; color: var(--ink); font-size: 14px; font-weight: 400; }
+  .dtoj-hw-tag-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+  .dtoj-hw-chip { position: relative; display: inline-flex; align-items: center; min-height: 34px; max-width: 100%; padding: 0 14px; border: 1px solid #dfe7f2; border-radius: 999px; background: rgba(255,255,255,.92); color: var(--ink); font-size: 14px; font-weight: 500; line-height: 1.4; cursor: pointer; transition: background-color .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+  .dtoj-hw-filter-submit { flex: 0 0 auto; font-family: inherit; }
+  .dtoj-hw-filter .dtoj-hw-chip { flex-direction: row; align-items: center; justify-content: center; }
+  .dtoj-hw-chip:hover { border-color: #c8d5e8; background: #f5f8fc; }
+  .dtoj-hw-chip:active { transform: translateY(1px); }
+  .dtoj-hw-chip.is-selected { border-color: var(--brand); background: var(--brand); color: #fff; font-weight: 600; box-shadow: 0 4px 10px rgba(37, 99, 235, .16); }
+  .dtoj-hw-chip.is-selected:hover { border-color: var(--brand-deep); background: var(--brand-deep); }
+  .dtoj-hw-chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .dtoj-hw-chip:has(input:focus-visible) { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px; }
+  .dtoj-hw-chip > span,
+  .dtoj-hw-chip em { line-height: 1; }
+  .dtoj-hw-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dtoj-hw-chip em { margin-left: 6px; color: var(--muted); font-size: 11px; font-style: normal; white-space: nowrap; }
+  .dtoj-hw-chip.is-selected em { color: rgba(255,255,255,.82); }
+  .dtoj-hw-chip[hidden] { display: none; }
+  .dtoj-hw-tags-empty { margin: 0; padding: 8px 2px; color: var(--muted); font-size: 12px; }
+  .dtoj-hw-page .dtoj-fields > .dtoj-hw-range-label { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 16px; width: fit-content; max-width: 100%; }
   .dtoj-hw-range {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
   .dtoj-hw-range .textbox {
-    flex: 1 1 0;
+    box-sizing: border-box;
+    flex: 0 1 160px;
     min-width: 0;
+    width: 160px;
+    max-width: 160px;
+    min-height: 40px;
+    margin: 0;
+    padding: 0 10px;
+    border: 1px solid rgba(30, 41, 59, 0.12);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    color-scheme: light;
   }
+  .dtoj-hw-range .textbox:focus-visible { border-color: var(--brand); outline: 3px solid rgba(37, 99, 235, 0.2); outline-offset: 1px; }
+  .dtoj-hw-range .textbox::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .72; }
   .dtoj-hw-range-sep { flex: none; color: var(--muted); }
-  .dtoj-hw-page form.dtoj-sheet-pad.dtoj-hw-filter .dtoj-actions .dtoj-go {
-    color: #fff;
-    background: var(--brand-deep);
-    box-shadow: 0 10px 22px rgba(30, 64, 175, 0.16);
-  }
-  .dtoj-hw-page form.dtoj-sheet-pad.dtoj-hw-filter .dtoj-actions .dtoj-hw-new {
-    margin-left: auto;
-    color: #fff;
-    background: linear-gradient(110deg, var(--brand), var(--mint));
-    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
-    text-decoration: none;
-  }
-
-  /* 作业行 */
-  .dtoj-hw-list { list-style: none; margin: 0; padding: 0; }
-  .dtoj-hw-row {
-    display: grid;
-    grid-template-columns: 84px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 18px;
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--line);
-  }
-  .dtoj-hw-row:last-child { border-bottom: 0; }
-  .dtoj-hw-row:hover { background: #f8fafc; }
+  /* 作业卡片 */
+  .dtoj-hw-card-head { grid-template-columns: 48px minmax(0, 1fr); align-items: center; }
   .dtoj-hw-when {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 9px 6px;
-    border-radius: 14px;
-    background: #f4f7fb;
-    color: var(--brand-deep);
+    padding: 5px 4px;
+    border: 1px solid rgba(255,255,255,.55);
+    border-radius: 9px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
     text-decoration: none;
   }
-  .dtoj-hw-when:hover { background: #e7eefb; }
+  .dtoj-hw-when:hover { background: rgba(255,255,255,.22); }
   .dtoj-hw-day {
     font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 900;
     line-height: 1.35;
     font-variant-numeric: tabular-nums;
+    color: #fff;
   }
-  .dtoj-hw-mon { font-size: 11px; font-weight: 700; line-height: 1.4; color: var(--muted); letter-spacing: 0.04em; }
+  .dtoj-hw-mon { font-size: 9px; font-weight: 700; line-height: 1.4; color: rgba(255,255,255,.85); letter-spacing: 0.04em; }
   .dtoj-hw-title {
     margin: 0;
     font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
-    font-size: 19px;
+    font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1.4;
   }
-  .dtoj-hw-title a { color: var(--ink); text-decoration: none; }
-  .dtoj-hw-title a:hover { color: var(--brand-deep); }
-  .dtoj-hw-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 14px;
-    margin: 8px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-  .dtoj-hw-meta b { margin-right: 4px; color: #4b5563; font-weight: 700; }
-  .dtoj-hw-meta .time { font-variant-numeric: tabular-nums; }
-  .dtoj-hw-meta .dtoj-hw-late,
-  .dtoj-hw-meta .dtoj-hw-late b { color: #6b5528; }
+  .dtoj-hw-title a { color: #fff; text-decoration: none; }
+  .dtoj-hw-title a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .dtoj-hw-main { min-width: 0; }
+  .dtoj-hw-card-status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .dtoj-hw-card-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-height: 190px; padding: 9px 12px 8px; }
+  .dtoj-hw-time-point.dtoj-hw-late,
+  .dtoj-hw-time-point.dtoj-hw-late time { color: #6b5528; }
   .dtoj-hw-state {
     display: inline-flex;
     align-items: center;
@@ -224,13 +209,19 @@
   }
   .dtoj-hw-claim.is-todo { background: #6a4b00; color: #f8f1dc; }
   .dtoj-hw-claim.is-done { background: #eef1f5; color: #4b5563; }
-  .dtoj-hw-facts { display: flex; gap: 22px; margin: 0; }
-  .dtoj-hw-facts > div { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-  .dtoj-hw-facts dt { margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1.4; letter-spacing: 0.06em; }
-  .dtoj-hw-facts dd { margin: 0; color: var(--ink); font-size: 17px; font-weight: 800; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  .dtoj-hw-problems { min-width: 0; margin-top: 2px; }
+  .dtoj-hw-problem-list { margin-top: 4px; }
+  .dtoj-hw-problem-empty { margin: 4px 0 0; color: #3e4c63; font-size: 12px; line-height: 1.35; }
+  .dtoj-hw-facts { display: flex; gap: 12px; margin: 2px 0 0; padding: 0; }
+  .dtoj-hw-facts > div { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .dtoj-hw-facts dt { margin: 0; color: var(--muted); font-size: 10px; font-weight: 700; line-height: 1.4; }
+  .dtoj-hw-facts dd { margin: 0; color: var(--ink); font-size: 15px; font-weight: 800; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  .dtoj-hw-card-footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); color: #3e4c63; font-size: 12px; }
+  .dtoj-hw-card-footer a { display: inline-flex; align-items: center; gap: 3px; color: var(--brand-deep); font-size: 12px; font-weight: 700; text-decoration: none; }
+  .dtoj-hw-card-footer a:hover { color: var(--brand); }
 
   /* 空态：没有作业，或筛完没有结果 */
-  .dtoj-hw-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 56px 24px 60px; text-align: center; }
+  .dtoj-hw-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 42px 24px 46px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 8px 22px rgba(28, 39, 64, 0.06); text-align: center; }
   .dtoj-hw-empty h2 {
     margin: 0;
     font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
@@ -402,16 +393,17 @@
   .dtoj-hw-merge-actions .dtoj-alt { border: 1px solid var(--line); background: #fff; color: var(--brand-deep); }
   .dtoj-hw-merge-note { margin: -4px 0 0; color: #a1472a; font-size: 12px; line-height: 1.7; }
 
-  @media (max-width: 800px) {
-    .dtoj-hw-page .dtoj-hw-filter .dtoj-fields { grid-template-columns: 1fr 1fr; }
-    .dtoj-hw-row { grid-template-columns: 64px minmax(0, 1fr); gap: 14px; padding: 16px; }
-    .dtoj-hw-day { font-size: 20px; }
-    .dtoj-hw-facts { grid-column: 2; flex-direction: row; gap: 18px; margin-top: 10px; }
-    .dtoj-hw-facts > div { align-items: flex-start; }
-  }
   @media (max-width: 600px) {
-    .dtoj-hw-page .dtoj-hw-filter .dtoj-fields { grid-template-columns: 1fr; }
+    .dtoj-hw-tag-row { flex-direction: column; gap: 4px; }
+    .dtoj-hw-tag-label { min-height: 0; }
+    .dtoj-hw-page .dtoj-fields > .dtoj-hw-range-label { align-items: flex-start; flex-direction: column; gap: 6px; width: 100%; }
+    .dtoj-hw-range { width: 100%; }
+    .dtoj-hw-range .textbox { flex: 1 1 0; width: 0; max-width: none; }
+    .dtoj-hw-tags-empty { margin-left: 0; }
     .dtoj-hw-empty { padding: 44px 18px 48px; }
+    .dtoj-classroom-head, .dtoj-hw-section-head { align-items: flex-start; flex-direction: column; gap: 5px; }
+    .dtoj-hw-page form.dtoj-sheet-pad .dtoj-hw-search-row .dtoj-hw-new { margin-left: 0; }
+    .dtoj-classroom-empty { padding: 18px; }
   }
 </style>
 <div class="row">
@@ -427,61 +419,78 @@
         {% endif %}
       </header>
 
-      <form method="get" class="dtoj-sheet dtoj-sheet-pad dtoj-hw-filter" name="filter-form">
-        <div class="dtoj-fields{% if isAdmin %} has-teacher{% endif %}">
-          <label>{{ _('Search') }}
-            <input type="text" class="textbox" name="q" value="{{ q }}" placeholder="{{ _('Search homeworks...') }}">
-          </label>
-          {% if isAdmin %}
-          <label>教师
-            <select class="select" name="teacher" data-hw-teacher>
-              <option value=""{% if not teacher %} selected{% endif %}>全部</option>
-              {%- for t in teacherOptions -%}
-              <option value="{{ t.uid }}"{% if teacher == t.uid %} selected{% endif %}>{{ t.name }}</option>
-              {%- endfor -%}
-            </select>
-          </label>
-          {% endif %}
-          <div class="dtoj-hw-field">
-            <span class="dtoj-hw-field-label">{{ _('Group') }}</span>
-            <div class="dtoj-hw-multi" data-hw-multi>
-              <button type="button" class="textbox dtoj-hw-multi-toggle" data-hw-multi-toggle
-                      aria-haspopup="true" aria-expanded="false">
-                <span class="dtoj-hw-multi-text" data-hw-multi-text>{% if group|length == 0 %}全部{% elif group|length == 1 %}{{ group[0] }}{% else %}已选 {{ group|length }} 项{% endif %}</span>
-                <span class="dtoj-hw-multi-caret" aria-hidden="true"></span>
-              </button>
-              <div class="dtoj-hw-multi-panel" data-hw-multi-panel hidden>
-                <label class="dtoj-hw-multi-all">
-                  <input type="checkbox" data-hw-multi-all{% if group|length == 0 %} checked{% endif %}>
-                  <span>全部</span>
-                </label>
-                {%- for g in groupOptions -%}
-                <label class="dtoj-hw-multi-item" data-owners="{{ g.owners|join(' ') }}" title="{{ g.name }}{% if g.ownerName %} · {{ g.ownerName }}{% endif %}">
-                  <input type="checkbox" name="group" value="{{ g.name }}"{% if group.includes(g.name) %} checked{% endif %}>
-                  <span>{{ g.name }}</span>
-                  {%- if isAdmin and g.ownerName %}<em>{{ g.ownerName }}</em>{% endif %}
-                </label>
-                {%- endfor -%}
-                <p class="dtoj-hw-multi-empty" data-hw-multi-empty hidden>这个教师名下还没有小组</p>
+      {% if hwSelfOnly %}
+      <section class="dtoj-classroom" aria-labelledby="dtoj-classroom-title">
+        <header class="dtoj-classroom-head">
+          <div><h2 id="dtoj-classroom-title">课堂练习</h2><p>只显示你所在小组已开始的课时；到开课时间会自动出现，之后会一直保留。</p></div>
+          {% if classroomLessons.length %}<span class="dtoj-classroom-count">共 {{ classroomLessons.length }} 节</span>{% endif %}
+        </header>
+        <form method="get" class="dtoj-sheet dtoj-sheet-pad dtoj-hw-filter" name="filter-form" data-hw-filter>
+          {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+          {% if teacher %}<input type="hidden" name="teacher" value="{{ teacher }}">{% endif %}
+          {% for name in group %}<input type="hidden" name="group" value="{{ name }}">{% endfor %}
+          {% if from %}<input type="hidden" name="from" value="{{ from }}">{% endif %}
+          {% if to %}<input type="hidden" name="to" value="{{ to }}">{% endif %}
+          <div class="dtoj-fields">
+            <div class="dtoj-hw-filter-tags">
+              <div class="dtoj-hw-tag-row">
+                <div class="dtoj-hw-tag-options" data-hw-tag-group role="group" aria-label="按小组筛选课堂练习">
+                  <label class="dtoj-hw-chip{% if not classGroup.length %} is-selected{% endif %}">
+                    <input type="checkbox" data-filter-all{% if not classGroup.length %} checked{% endif %}>
+                    <span>全部</span>
+                  </label>
+                  {% for g in classroomGroups %}
+                  <label class="dtoj-hw-chip{% if classGroup.includes(g) %} is-selected{% endif %}">
+                    <input type="checkbox" name="classGroup" value="{{ g }}" data-filter-option{% if classGroup.includes(g) %} checked{% endif %}>
+                    <span>{{ g }}</span>
+                  </label>
+                  {% endfor %}
+                </div>
               </div>
             </div>
+            <div class="dtoj-hw-range-label" role="group" aria-label="课堂练习时间范围">
+              <span class="dtoj-hw-range">
+                <input type="date" class="textbox" name="classFrom" value="{{ classFrom }}" aria-label="课堂练习起始日期">
+                <span class="dtoj-hw-range-sep">—</span>
+                <input type="date" class="textbox" name="classTo" value="{{ classTo }}" aria-label="课堂练习结束日期">
+              </span>
+              <button type="submit" class="dtoj-hw-chip is-selected dtoj-hw-filter-submit">筛选</button>
+            </div>
           </div>
-          <label class="dtoj-hw-range-label">{{ _('Time Range') }}
-            <span class="dtoj-hw-range">
-              <input type="date" class="textbox" name="from" value="{{ from }}" aria-label="起始日期">
-              <span class="dtoj-hw-range-sep">—</span>
-              <input type="date" class="textbox" name="to" value="{{ to }}" aria-label="结束日期">
-            </span>
-          </label>
-        </div>
-        <div class="dtoj-actions">
-          <button type="submit" class="dtoj-go">{{ _('Search') }}</button>
-          <a class="dtoj-alt" href="{{ url('homework_main') }}">{{ _('Reset') }}</a>
-          {% if tdocs.length and handler.user.hasPerm(perm.PERM_CREATE_HOMEWORK) %}
-          <a class="dtoj-go dtoj-hw-new" href="{{ url('homework_create') }}">{{ _('Create Homework') }}</a>
-          {% endif %}
-        </div>
-      </form>
+        </form>
+        {% if classroomLessons.length %}
+        <ol class="dtoj-classroom-list">
+          {% for lesson in classroomLessons %}
+          <li class="dtoj-classroom-item">
+            <div class="dtoj-classroom-card-head">
+              <svg class="dtoj-classroom-lines" viewBox="0 0 320 180" aria-hidden="true"><path d="M-10 40c70 36 120 8 190-28s90-20 150 8"/><path d="M40 -20c30 70 20 110-10 170"/><path d="M210 8c48 42 70 30 120-16"/><path d="M250 50c36 48 28 90 8 140"/></svg>
+              <span class="dtoj-classroom-label">{{ lesson.group }}</span>
+              <span class="dtoj-classroom-card-count">{{ lesson.problems.length }} 道题</span>
+              <h3 class="dtoj-classroom-title">{{ lesson.title }}</h3>
+            </div>
+            <div class="dtoj-classroom-card-body">
+              <div class="dtoj-classroom-time" aria-label="上课时间">
+                <div class="dtoj-classroom-time-point"><span>开始</span><time>{{ lesson.start }}</time></div>
+                <div class="dtoj-classroom-time-point"><span>结束</span><time>{{ lesson.end }}</time></div>
+              </div>
+              <section class="dtoj-classroom-problems">
+                <div class="dtoj-classroom-problems-head"><h3>本节题单</h3><span>共 {{ lesson.problems.length }} 道</span></div>
+                <ol>{% for problem in lesson.problems %}<li><span class="dtoj-classroom-problem-n">{{ loop.index }}.</span>{% if problem.url %}<a href="{{ problem.url }}">{{ problem.title }}</a>{% else %}<span>{{ problem.title }}</span>{% endif %}</li>{% endfor %}</ol>
+              </section>
+              <footer class="dtoj-classroom-course">{% if lesson.trainingId %}<a href="{{ url('dtoj_training_detail', tid=lesson.trainingId) }}" title="继续训练课程：{{ lesson.trainingTitle }}" aria-label="继续训练课程：{{ lesson.trainingTitle }}">继续训练课程 <span aria-hidden="true">→</span></a>{% else %}<span>课堂练习</span>{% endif %}</footer>
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        {% if classQ or classGroup.length or classFrom or classTo %}
+        <p class="dtoj-classroom-empty">没有符合条件的课堂练习。请调整搜索条件，或清空课堂筛选后再试。</p>
+        {% else %}
+        <p class="dtoj-classroom-empty">当前还没有已开始的课堂练习。老师安排的课时会在开课时间自动显示，之后会一直保留。</p>
+        {% endif %}
+        {% endif %}
+      </section>
+      {% endif %}
 
       {% if mergeGroups|length %}
       <section class="dtoj-sheet dtoj-hw-merge" aria-labelledby="dtoj-hw-merge-title">
@@ -503,7 +512,64 @@
       </section>
       {% endif %}
 
-      <section class="dtoj-sheet dtoj-hw-sheet">
+      <section class="dtoj-hw-board">
+        <header class="dtoj-hw-section-head"><div><h2>{% if hwSelfOnly %}课后作业{% else %}作业列表{% endif %}</h2>{% if hwSelfOnly %}<p>老师另外布置给你的作业会列在这里。</p>{% endif %}</div></header>
+        <form method="get" class="dtoj-sheet dtoj-sheet-pad dtoj-hw-filter" name="filter-form" data-hw-filter>
+          {% if classQ %}<input type="hidden" name="classQ" value="{{ classQ }}">{% endif %}
+          {% for name in classGroup %}<input type="hidden" name="classGroup" value="{{ name }}">{% endfor %}
+          {% if classFrom %}<input type="hidden" name="classFrom" value="{{ classFrom }}">{% endif %}
+          {% if classTo %}<input type="hidden" name="classTo" value="{{ classTo }}">{% endif %}
+          <div class="dtoj-fields">
+            <div class="dtoj-hw-filter-tags">
+              {% if isAdmin %}
+              <div class="dtoj-hw-tag-row">
+                <span class="dtoj-hw-tag-label">教师</span>
+                <div class="dtoj-hw-tag-options" role="group" aria-label="按教师筛选">
+                  <label class="dtoj-hw-chip{% if not teacher %} is-selected{% endif %}">
+                    <input type="radio" name="teacher" value="" data-filter-teacher{% if not teacher %} checked{% endif %}>
+                    <span>全部</span>
+                  </label>
+                  {% for t in teacherOptions %}
+                  <label class="dtoj-hw-chip{% if teacher == t.uid %} is-selected{% endif %}">
+                    <input type="radio" name="teacher" value="{{ t.uid }}" data-filter-teacher{% if teacher == t.uid %} checked{% endif %}>
+                    <span>{{ t.name }}</span>
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              <div class="dtoj-hw-tag-row">
+                <div class="dtoj-hw-tag-options" data-hw-tag-group role="group" aria-label="按小组筛选课后作业">
+                  <label class="dtoj-hw-chip{% if not group.length %} is-selected{% endif %}">
+                    <input type="checkbox" data-filter-all{% if not group.length %} checked{% endif %}>
+                    <span>全部</span>
+                  </label>
+                  {% for g in groupOptions %}
+                  <label class="dtoj-hw-chip{% if group.includes(g.name) %} is-selected{% endif %}" data-filter-group data-owners="{{ g.owners|join(' ') }}" title="{{ g.name }}{% if g.ownerName %} · {{ g.ownerName }}{% endif %}">
+                    <input type="checkbox" name="group" value="{{ g.name }}" data-filter-option{% if group.includes(g.name) %} checked{% endif %}>
+                    <span>{{ g.name }}</span>
+                    {% if isAdmin and g.ownerName %}<em>{{ g.ownerName }}</em>{% endif %}
+                  </label>
+                  {% endfor %}
+                  <span class="dtoj-hw-tags-empty" data-filter-empty hidden>这个教师名下还没有小组</span>
+                </div>
+              </div>
+            </div>
+            <div class="dtoj-hw-range-label" role="group" aria-label="课后作业时间范围">
+              <span class="dtoj-hw-range">
+                <input type="date" class="textbox" name="from" value="{{ from }}" aria-label="课后作业起始日期">
+                <span class="dtoj-hw-range-sep">—</span>
+                <input type="date" class="textbox" name="to" value="{{ to }}" aria-label="课后作业结束日期">
+              </span>
+              <button type="submit" class="dtoj-hw-chip is-selected dtoj-hw-filter-submit">筛选</button>
+            </div>
+          </div>
+          <div class="dtoj-hw-search-row">
+            {% if tdocs.length and handler.user.hasPerm(perm.PERM_CREATE_HOMEWORK) %}
+            <a class="dtoj-go dtoj-hw-new" href="{{ url('homework_create') }}">{{ _('Create Homework') }}</a>
+            {% endif %}
+          </div>
+        </form>
         {% if not tdocs.length %}
         <div class="dtoj-hw-empty">
           {% if q or group|length or teacher or from or to %}
@@ -512,7 +578,7 @@
           <a class="dtoj-hw-reset" href="{{ url('homework_main') }}">清空筛选</a>
           {% elif hwSelfOnly %}
           <h2>暂时没有你的作业</h2>
-          <p>老师布置给你的作业会出现在这里，也会在首页提醒你认领。</p>
+          <p>老师布置给你的课后作业会出现在这里，也会在首页提醒你认领。</p>
           {% else %}
           <h2>还没有作业</h2>
           <p>建第一份作业：写好标题和时间，填上题号，再选要分给的小组或同学。</p>
@@ -532,35 +598,50 @@
           {% set hwStateText = '已完成' if hwState == 'finished' else ('延期递交' if model.contest.isExtended(tdoc) else ('未开始' if model.contest.isNotStarted(tdoc) else _(model.contest.statusText(tdoc)))) %}
           {% set hwHasLate = tdoc.endAt.getTime() > tdoc.penaltySince.getTime() %}
           <li class="dtoj-hw-row">
-            <a class="dtoj-hw-when" href="{{ url('homework_detail', tid=tdoc.docId) }}">
-              <span class="dtoj-hw-day">{{ datetimeSpan(tdoc['penaltySince'], false, 'D')|safe }}</span>
-              <span class="dtoj-hw-mon">{{ datetimeSpan(tdoc['penaltySince'], false, 'YYYY-M')|safe }}</span>
-            </a>
-            <div class="dtoj-hw-main">
+            <div class="dtoj-hw-card-head">
+              <svg class="dtoj-hw-lines" viewBox="0 0 320 180" aria-hidden="true"><path d="M-10 40c70 36 120 8 190-28s90-20 150 8"/><path d="M40 -20c30 70 20 110-10 170"/><path d="M210 8c48 42 70 30 120-16"/><path d="M250 50c36 48 28 90 8 140"/></svg>
+              <a class="dtoj-hw-when" href="{{ url('homework_detail', tid=tdoc.docId) }}">
+                <span class="dtoj-hw-day">{{ datetimeSpan(tdoc['penaltySince'], false, 'D')|safe }}</span>
+                <span class="dtoj-hw-mon">{{ datetimeSpan(tdoc['penaltySince'], false, 'YYYY-M')|safe }}</span>
+              </a>
+              <div class="dtoj-hw-main">
               <h2 class="dtoj-hw-title">
                 <a href="{{ url('homework_detail', tid=tdoc.docId) }}" data-emoji-enabled>{{ tdoc.title }}</a>
               </h2>
-              <p class="dtoj-hw-meta">
+                <p class="dtoj-hw-card-status">
                 {% if tdoc.hwAssigned %}
                 <span class="dtoj-hw-claim {{ 'is-done' if tdoc.hwAttended else 'is-todo' }}">{{ '已认领' if tdoc.hwAttended else '待认领' }}</span>
                 {% endif %}
                 <span class="dtoj-hw-state" data-state="{{ hwState }}">{{ hwStateText }}</span>
-                <span><b>{{ _('Open Since') }}</b>{{ datetimeSpan(tdoc['beginAt'], false, 'M-D H:mm')|safe }}</span>
-                <span><b>{{ _('Deadline') }}</b>{{ datetimeSpan(tdoc['penaltySince'], false, 'M-D H:mm')|safe }}</span>
-                {% if hwHasLate %}
-                <span class="dtoj-hw-late"><b>{{ _('Hard Deadline') }}</b>{{ datetimeSpan(tdoc['endAt'], false, 'M-D H:mm')|safe }}</span>
-                {% endif %}
-              </p>
+                </p>
+              </div>
             </div>
-            <dl class="dtoj-hw-facts">
-              <div><dt>题目</dt><dd>{{ tdoc.pids|length }}</dd></div>
-              {% if not hwSelfOnly %}
-              <div><dt>已认领</dt><dd>{{ tdoc.hwClaimed|default(0) }}</dd></div>
-              {% if tdoc.hwUnclaimed is not none %}
-              <div><dt>未认领</dt><dd>{{ tdoc.hwUnclaimed }}</dd></div>
-              {% endif %}
-              {% endif %}
-            </dl>
+            <div class="dtoj-hw-card-body">
+              <div class="dtoj-hw-time" aria-label="作业时间">
+                <div class="dtoj-hw-time-point"><span>{{ _('Open Since') }}</span><time>{{ datetimeSpan(tdoc['beginAt'], false, 'M-D H:mm')|safe }}</time></div>
+                <div class="dtoj-hw-time-point"><span>{{ _('Deadline') }}</span><time>{{ datetimeSpan(tdoc['penaltySince'], false, 'M-D H:mm')|safe }}</time></div>
+                {% if hwHasLate %}<div class="dtoj-hw-time-point dtoj-hw-late"><span>{{ _('Hard Deadline') }}</span><time>{{ datetimeSpan(tdoc['endAt'], false, 'M-D H:mm')|safe }}</time></div>{% endif %}
+              </div>
+              <div class="dtoj-hw-problems">
+                <span>题目</span>
+                {% if tdoc.hwProblems.length %}
+                <ol class="dtoj-hw-problem-list">
+                  {% for problem in tdoc.hwProblems %}<li><span class="dtoj-hw-problem-n">{{ loop.index }}.</span><span>{{ problem }}</span></li>{% endfor %}
+                </ol>
+                {% else %}
+                <p class="dtoj-hw-problem-empty">暂无可显示的题目</p>
+                {% endif %}
+              </div>
+              <dl class="dtoj-hw-facts">
+                {% if not hwSelfOnly %}
+                <div><dt>已认领</dt><dd>{{ tdoc.hwClaimed|default(0) }}</dd></div>
+                {% if tdoc.hwUnclaimed is not none %}
+                <div><dt>未认领</dt><dd>{{ tdoc.hwUnclaimed }}</dd></div>
+                {% endif %}
+                {% endif %}
+              </dl>
+              <footer class="dtoj-hw-card-footer"><a href="{{ url('homework_detail', tid=tdoc.docId) }}">查看作业 <span aria-hidden="true">→</span></a></footer>
+            </div>
           </li>
           {%- endfor -%}
         </ol>
@@ -605,6 +686,22 @@
   </div>
 </div>
 <script>
+  // 学生如果在课堂开始前已打开本页，按所属小组下一节课的开课时间刷新，
+  // 让课堂练习准时出现，不需要手动重载。
+  (function () {
+    var at = {{ classroomRefreshAt or 0 }};
+    if (!at || at <= Date.now()) return;
+    function refreshAtTransition() {
+      var left = at - Date.now();
+      if (left <= 0) {
+        window.location.reload();
+        return;
+      }
+      window.setTimeout(refreshAtTransition, Math.min(left + 50, 2147483000));
+    }
+    refreshAtTransition();
+  }());
+
   // Hydro 自带的月历有两处没本地化：月份标题是 moment 的英文月份名（October 2026），
   // 星期表头是组件里写死的 SUN..SAT。这里只在这一页把它们换成中文。
   // 月历是在页面 JS 的异步初始化里才挂到 [name="calendar_entry"] 上的，
@@ -680,63 +777,65 @@
     });
   }());
 
-  // 小组多选：原生 select 只能选一个，这里用一个勾选面板替代。
-  // 「全部」等于不带 group 参数；选了教师之后，面板里只留那个教师名下的小组，
-  // 被隐藏的小组同时取消勾选 —— 否则提交出去的条件和界面上看到的不一致。
+  // 两个作业区各自有独立筛选表单；分组用标签多选，「全部」等于不带分组参数。
+  // 管理员切换教师时，标签只显示该教师的小组，并取消隐藏小组的勾选。
   (function () {
-    var box = document.querySelector('[data-hw-multi]');
-    if (!box) return;
-    var form = box.closest('form');
-    var toggle = box.querySelector('[data-hw-multi-toggle]');
-    var panel = box.querySelector('[data-hw-multi-panel]');
-    var text = box.querySelector('[data-hw-multi-text]');
-    var all = box.querySelector('[data-hw-multi-all]');
-    var empty = box.querySelector('[data-hw-multi-empty]');
-    var teacher = form ? form.querySelector('[data-hw-teacher]') : null;
-    var items = Array.prototype.slice.call(box.querySelectorAll('.dtoj-hw-multi-item'));
-    function inputOf(item) { return item.querySelector('input[type="checkbox"]'); }
+    var forms = document.querySelectorAll('[data-hw-filter]');
+    forms.forEach(function (form) {
+      var groups = Array.prototype.slice.call(form.querySelectorAll('[data-hw-tag-group]'));
+      var teacherInputs = form.querySelectorAll('[data-filter-teacher]');
 
-    function syncText() {
-      var picked = items.filter(function (item) { return inputOf(item).checked; });
-      if (!picked.length) text.textContent = '全部';
-      else if (picked.length === 1) text.textContent = inputOf(picked[0]).value;
-      else text.textContent = '已选 ' + picked.length + ' 项';
-      if (all) all.checked = !picked.length;
-    }
-    function applyTeacher() {
-      var uid = teacher ? teacher.value : '';
-      var shown = 0;
-      items.forEach(function (item) {
-        // 一个组可能归多个人：有 owner 的算 owner，没有 owner 的老组算在所有管理员头上
-        var owners = (item.getAttribute('data-owners') || '').split(' ');
-        var match = !uid || owners.indexOf(uid) !== -1;
-        item.hidden = !match;
-        if (match) shown += 1;
-        else inputOf(item).checked = false;
-      });
-      if (empty) empty.hidden = shown > 0;
-      syncText();
-    }
-    function setOpen(open) {
-      panel.hidden = !open;
-      box.classList.toggle('is-open', open);
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    toggle.addEventListener('click', function (e) {
-      e.stopPropagation();
-      setOpen(panel.hidden);
-    });
-    document.addEventListener('click', function (e) {
-      if (!box.contains(e.target)) setOpen(false);
-    });
-    box.addEventListener('change', function (e) {
-      if (e.target === all) {
-        items.forEach(function (item) { inputOf(item).checked = false; });
+      function syncGroup(group) {
+        var all = group.querySelector('[data-filter-all]');
+        var items = Array.prototype.slice.call(group.querySelectorAll('[data-filter-option]'));
+        var hasPicked = items.some(function (input) { return input.checked; });
+        if (all) all.checked = !hasPicked;
+        group.querySelectorAll('.dtoj-hw-chip').forEach(function (chip) {
+          var input = chip.querySelector('input');
+          if (input) chip.classList.toggle('is-selected', input.checked);
+        });
       }
-      syncText();
+
+      function applyTeacher() {
+        var selected = form.querySelector('[data-filter-teacher]:checked');
+        if (!selected) return;
+        var uid = selected.value;
+        groups.forEach(function (group) {
+          var items = Array.prototype.slice.call(group.querySelectorAll('[data-filter-group]'));
+          var empty = group.querySelector('[data-filter-empty]');
+          var shown = 0;
+          items.forEach(function (item) {
+            var owners = (item.getAttribute('data-owners') || '').split(' ');
+            var match = !uid || owners.indexOf(uid) !== -1;
+            item.hidden = !match;
+            if (match) shown += 1;
+            else item.querySelector('[data-filter-option]').checked = false;
+          });
+          if (empty) empty.hidden = shown > 0;
+          syncGroup(group);
+        });
+      }
+
+      groups.forEach(function (group) {
+        group.addEventListener('change', function (event) {
+          var all = group.querySelector('[data-filter-all]');
+          if (event.target === all && all.checked) {
+            group.querySelectorAll('[data-filter-option]').forEach(function (input) { input.checked = false; });
+          }
+          syncGroup(group);
+        });
+        syncGroup(group);
+      });
+      teacherInputs.forEach(function (input) {
+        input.addEventListener('change', function () {
+          form.querySelectorAll('[data-filter-teacher]').forEach(function (radio) {
+            radio.closest('.dtoj-hw-chip').classList.toggle('is-selected', radio.checked);
+          });
+          applyTeacher();
+        });
+      });
+      applyTeacher();
     });
-    if (teacher) teacher.addEventListener('change', applyTeacher);
-    applyTeacher();
   }());
 </script>
 {% endblock %}

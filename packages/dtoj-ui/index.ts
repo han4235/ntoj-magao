@@ -1,8 +1,10 @@
 import { escapeRegExp } from 'lodash';
 import {
-    canViewAllDomainRecords, ContestModel, ContestNotFoundError, Context, CreateError as Err, DocumentModel, DomainModel, ForbiddenError, Handler,
+    canViewAllDomainRecords, ContestModel, ContestNotFoundError, Context, CreateError as Err, db, DocumentModel,
+    DomainModel, ForbiddenError, Handler,
     HomeworkNotAttendedError, HomeworkNotLiveError, moment, NotAssignedError, ObjectId, OplogModel, param,
-    PERM, PermissionError, ProblemModel, ProblemNotFoundError, PRIV, query, RecordModel, STATUS, StorageModel, Types, UserModel, ValidationError,
+    PERM, PermissionError, ProblemModel, ProblemNotFoundError, PRIV, query, RecordModel, STATUS,
+    StorageModel, TrainingModel, Types, UserModel, ValidationError,
 } from 'hydrooj';
 import {
     askHomeworkQuestion, bridgeInboxReply, listHomeworkProgress, listHomeworkQuestions,
@@ -25,8 +27,8 @@ import {
     STUDENT_DEFAULT_PASSWORD, studentRoleName,
 } from './domainUsers';
 
-export { hasHomeworkSubmission, myAttendedHomeworkIds, myHomeworkGroups, myPendingHomework } from './homeworkScope';
 export { studentNotesForUsers } from './domainUsers';
+export { hasHomeworkSubmission, myAttendedHomeworkIds, myHomeworkGroups, myPendingHomework } from './homeworkScope';
 
 /** 交过题的作业不给撤认领，见 DtojHomeworkUnclaimHandler 与 hasHomeworkSubmission。 */
 export const HomeworkSubmittedError = Err(
@@ -36,6 +38,28 @@ export const HomeworkSubmittedError = Err(
 );
 
 const DOMAIN_ROLE_SETTING_KEYS = new Set(['default.userRole', 'default.teacherRole']);
+const LESSON_COLL = 'dtoj_lesson_prep';
+
+interface LessonPrepDoc {
+    _id: ObjectId;
+    domainId: string;
+    owner: number;
+    title: string;
+    group: string;
+    startAt: Date;
+    endAt: Date;
+    pids: number[];
+    trainingId?: ObjectId | null;
+    trainingNodeId?: number | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+declare module 'hydrooj' {
+    interface Collections {
+        dtoj_lesson_prep: LessonPrepDoc;
+    }
+}
 
 /**
  * 题目页「添加作业」建的作业用的扣分规则，抄自 partials/homework_default_penalty_rules.yaml。
@@ -162,9 +186,14 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
     @param('q', Types.String, true)
     @param('from', Types.Date, true)
     @param('to', Types.Date, true)
+    @param('classQ', Types.String, true)
+    @param('classGroup', Types.ArrayOf(Types.String, true), true)
+    @param('classFrom', Types.Date, true)
+    @param('classTo', Types.Date, true)
     async get(
         domainId: string, groupPicked: string[] = [], teacherPick: number, page = 1, q = '',
-        fromDate = '', toDate = '',
+        fromDate = '', toDate = '', classQ = '', classGroupPicked: string[] = [],
+        classFromDate = '', classToDate = '',
     ) {
         const canViewAll = this.user.hasPerm(PERM.PERM_VIEW_HIDDEN_HOMEWORK);
         const loggedIn = this.user.hasPriv(PRIV.PRIV_USER_PROFILE);
@@ -188,7 +217,90 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
         if (unknown) throw new NotAssignedError(unknown);
 
         const myGroups = loggedIn ? await myHomeworkGroups(domainId, this.user._id) : [];
+        const classroomGroups = myGroups.filter((name) => !/^\d+$/.test(name));
+        const pickedClassGroups = [...new Set(classGroupPicked.map((name) => (name || '').trim()).filter(Boolean))];
+        const unknownClassGroup = pickedClassGroups.find((name) => !classroomGroups.includes(name));
+        if (unknownClassGroup) throw new NotAssignedError(unknownClassGroup);
         const attended = loggedIn ? await myAttendedHomeworkIds(domainId, this.user._id) : new Set<string>();
+        const tz = this.user.timeZone || 'Asia/Shanghai';
+
+        // 学生的课堂练习直接来自其所属小组的备课；开课后持续可见，不因结束时间而收起。
+        // 训练章节来源的课时一开放就自动加入课程；TrainingModel.enroll 对重复参加有幂等保护。
+        const classroomLessons: any[] = [];
+        let classroomRefreshAt: number | null = null;
+        let classFrom = classFromDate;
+        let classTo = classToDate;
+        if (classFrom && classTo && classFrom > classTo) [classFrom, classTo] = [classTo, classFrom];
+        if (loggedIn && !canViewAll && myGroups.length) {
+            const now = new Date();
+            const classroomFilter: Record<string, any> = {
+                domainId,
+                group: { $in: pickedClassGroups.length ? pickedClassGroups : myGroups },
+                startAt: { $lte: now },
+            };
+            const classFromAt = classFrom ? moment.tz(classFrom, 'YYYY-MM-DD', tz).startOf('day').toDate() : null;
+            const classToAt = classTo ? moment.tz(classTo, 'YYYY-MM-DD', tz).endOf('day').toDate() : null;
+            if (classFromAt || classToAt) classroomFilter.$and = [];
+            if (classFromAt) classroomFilter.$and.push({ endAt: { $gte: classFromAt } });
+            if (classToAt) classroomFilter.$and.push({ startAt: { $lte: classToAt } });
+            if (classQ) {
+                const escaped = escapeRegExp(classQ.toLowerCase());
+                const pattern = new RegExp(classQ.length >= 2 ? escaped : `\\A${escaped}`, 'gim');
+                classroomFilter.$or = [{ title: pattern }, { group: pattern }];
+            }
+            const activeDocs = await db.collection(LESSON_COLL).find(classroomFilter)
+                .sort({ startAt: -1 }).toArray();
+            const upcoming = await db.collection(LESSON_COLL).find({
+                domainId,
+                group: { $in: myGroups },
+                startAt: { $gt: now },
+            }).sort({ startAt: 1 }).limit(1).toArray();
+            const trainingIds = [...new Map(activeDocs
+                .map((lesson) => lesson.trainingId)
+                .filter((id): id is ObjectId => id instanceof ObjectId)
+                .map((id) => [id.toHexString(), id])).values()];
+            const trainingDocs = trainingIds.length
+                ? await TrainingModel.getMulti(domainId, { docId: { $in: trainingIds } }).toArray()
+                : [];
+            const trainingById = new Map(trainingDocs.map((doc) => [doc.docId.toHexString(), doc]));
+            for (const id of trainingIds) {
+                if (!trainingById.has(id.toHexString())) continue;
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    await TrainingModel.enroll(domainId, id, this.user._id);
+                } catch (err) {
+                    const name = String((err as any)?.name || (err as any)?.constructor?.name || '');
+                    if (!name.includes('TrainingAlreadyEnroll')) throw err;
+                }
+            }
+            const classroomPids = [...new Set(activeDocs.flatMap((lesson) => lesson.pids || []))];
+            const classroomPdict = await ProblemModel.getList(
+                domainId, classroomPids,
+                this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || this.user._id,
+                false,
+            );
+            classroomLessons.push(...activeDocs.map((lesson) => {
+                const training = lesson.trainingId ? trainingById.get(lesson.trainingId.toHexString()) : null;
+                return {
+                    title: lesson.title,
+                    group: lesson.group,
+                    start: moment(lesson.startAt).tz(tz).format('YYYY-MM-DD HH:mm'),
+                    end: moment(lesson.endAt).tz(tz).format('YYYY-MM-DD HH:mm'),
+                    trainingId: training?.docId,
+                    trainingTitle: training?.title,
+                    problems: (lesson.pids || []).map((pid: number) => {
+                        const pdoc = classroomPdict[pid];
+                        return {
+                            pid,
+                            title: pdoc?.title || '题目当前不可见',
+                            url: pdoc ? this.url('problem_detail', { pid: pdoc.pid || pid }) : '',
+                        };
+                    }),
+                };
+            }));
+            const nextTransition = upcoming[0]?.startAt.getTime();
+            if (nextTransition) classroomRefreshAt = nextTransition;
+        }
 
         const filter: Record<string, any> = { rule: 'homework' };
         if (isTeacher) {
@@ -227,7 +339,6 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
         // 时间范围按用户所在时区整天算：起那天 00:00、止那天 23:59:59。
         // 只要作业的进行期（开始 → 最终截止）跟这段时间有重叠就列出来，
         // 这样查「这周要做哪些作业」时，跨周的作业不会漏掉。
-        const tz = this.user.timeZone || 'Asia/Shanghai';
         let from = fromDate;
         let to = toDate;
         if (from && to && from > to) [from, to] = [to, from];
@@ -267,10 +378,17 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
         // 徽章上的「已完成」：老师看名单上是不是人人 AC，学生看自己是不是每道题都 AC
         const myDone = loggedIn ? await myCompletedHomeworks(domainId, this.user._id, tdocs) : new Set<string>();
         const classDone = canViewAll ? await classCompletedHomeworks(domainId, tdocs, stats) : new Set<string>();
+        const homeworkPids = [...new Set(tdocs.flatMap((tdoc) => tdoc.pids || []))];
+        const homeworkPdict = await ProblemModel.getList(
+            domainId, homeworkPids, true, false, ProblemModel.PROJECTION_CONTEST_LIST,
+        );
         const rows = tdocs.map((tdoc) => {
             const stat = stats.get(String(tdoc.docId));
             return {
                 ...tdoc,
+                hwProblems: (tdoc.pids || []).slice(0, 2)
+                    .map((pid) => homeworkPdict[pid]?.title)
+                    .filter((title): title is string => Boolean(title)),
                 hwAssigned: (tdoc.assign || []).some((name) => groupSet.has(name)),
                 hwAttended: attended.has(String(tdoc.docId)),
                 hwCompleted: (canViewAll ? classDone : myDone).has(String(tdoc.docId)),
@@ -374,8 +492,14 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
         for (const name of picked) params.append('group', name);
         if (from) params.set('from', from);
         if (to) params.set('to', to);
+        if (classQ) params.set('classQ', classQ);
+        for (const name of pickedClassGroups) params.append('classGroup', name);
+        if (classFrom) params.set('classFrom', classFrom);
+        if (classTo) params.set('classTo', classTo);
         this.response.body = {
             tdocs: rows,
+            classroomLessons,
+            classroomRefreshAt,
             calendar,
             mergeGroups,
             tpcount,
@@ -386,9 +510,14 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
             teacherOptions,
             groupOptions,
             group: picked,
+            classGroup: pickedClassGroups,
             q,
             from,
             to,
+            classQ,
+            classFrom,
+            classTo,
+            classroomGroups,
             hwSelfOnly: !canViewAll && loggedIn,
         };
         this.response.template = 'homework_main.html';
@@ -936,6 +1065,223 @@ export function dropEarlierRoutes(ctx: Context, paths: string[]) {
     }
 }
 
+function requireLessonTeacher(handler: Handler) {
+    if (!canManageGroups(handler.user)) throw new PermissionError(PERM.PERM_MANAGE_GROUP);
+}
+
+function lessonTimeText(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(date);
+    const part = (name: string) => parts.find((item) => item.type === name)?.value || '';
+    return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
+function lessonTime(value: string, field: string) {
+    if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value)) throw new ValidationError(field);
+    const date = new Date(`${value}:00+08:00`);
+    if (Number.isNaN(date.getTime()) || lessonTimeText(date) !== value) throw new ValidationError(field);
+    return date;
+}
+
+function lessonDate(value: string) {
+    if (!/^\d{4}-\d\d-\d\d$/.test(value)) return null;
+    const date = new Date(`${value}T00:00:00+08:00`);
+    return Number.isNaN(date.getTime()) || lessonTimeText(date).slice(0, 10) !== value ? null : date;
+}
+
+async function lessonGroups(domainId: string, handler: Handler) {
+    requireLessonTeacher(handler);
+    return manageableGroups(domainId, handler.user);
+}
+
+async function lessonTrainingOptions(domainId: string, handler: Handler) {
+    if (!handler.user.hasPerm(PERM.PERM_VIEW_TRAINING)) return [];
+    const courses = await TrainingModel.getMulti(domainId, {}).toArray();
+    return courses.flatMap((course) => (course.dag || [])
+        .filter((node: any) => Number.isSafeInteger(+node._id) && +node._id > 0 && node.pids?.length)
+        .map((node: any) => ({
+            value: `${course.docId.toHexString()}:${node._id}`,
+            title: `${course.title} / ${node.title || `第 ${node._id} 章`}`,
+            count: node.pids.length,
+        })))
+        .sort((a, b) => a.title.localeCompare(b.title, 'zh-Hans-CN'));
+}
+
+async function lessonProblems(domainId: string, handler: Handler, raw: string) {
+    const tokens = raw.split(/[\s,，]+/).filter(Boolean);
+    if (!tokens.length || tokens.length > 50) throw new ValidationError('pids');
+    const pids: number[] = [];
+    for (const token of tokens) {
+        // eslint-disable-next-line no-await-in-loop
+        const pdoc = await ProblemModel.get(domainId, token);
+        if (!pdoc) throw new ValidationError('pids', null, `题库里没有题号 ${token}`);
+        if (!pids.includes(pdoc.docId)) pids.push(pdoc.docId);
+    }
+    await ProblemModel.getList(domainId, pids, handler.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || handler.user._id);
+    return pids;
+}
+
+async function lessonProblemSource(domainId: string, handler: Handler, trainingChapter: string, rawPids: string) {
+    if (!trainingChapter) {
+        return { pids: await lessonProblems(domainId, handler, rawPids), trainingId: null, trainingNodeId: null };
+    }
+    if (!handler.user.hasPerm(PERM.PERM_VIEW_TRAINING)) throw new PermissionError(PERM.PERM_VIEW_TRAINING);
+    const match = trainingChapter.match(/^([a-f\d]{24}):(\d+)$/i);
+    if (!match || !ObjectId.isValid(match[1])) throw new ValidationError('trainingChapter');
+    const trainingId = new ObjectId(match[1]);
+    const trainingNodeId = Number(match[2]);
+    if (!Number.isSafeInteger(trainingNodeId) || trainingNodeId < 1) throw new ValidationError('trainingChapter');
+    const course = await TrainingModel.get(domainId, trainingId).catch(() => null);
+    const chapter = course?.dag?.find((node: any) => +node._id === trainingNodeId);
+    if (!course || !chapter?.pids?.length) throw new ValidationError('trainingChapter');
+    const pids = Array.from(new Set<number>(
+        (chapter.pids as number[]).map((pid) => Number(pid)).filter((pid) => Number.isSafeInteger(pid) && pid > 0),
+    ));
+    if (!pids.length) throw new ValidationError('trainingChapter');
+    await ProblemModel.getList(
+        domainId, pids,
+        handler.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || handler.user._id,
+    );
+    return { pids, trainingId, trainingNodeId };
+}
+
+async function lessonEditDoc(domainId: string, handler: Handler, id: ObjectId) {
+    requireLessonTeacher(handler);
+    const doc = await db.collection(LESSON_COLL).findOne({ _id: id, domainId });
+    if (!doc || (!managesAllGroups(handler.user) && doc.owner !== handler.user._id)) {
+        throw new PermissionError(PERM.PERM_MANAGE_GROUP);
+    }
+    return doc;
+}
+
+class DtojLessonPrepHandler extends DtojDataHandler {
+    @query('from', Types.String, true)
+    @query('to', Types.String, true)
+    async get({ domainId }: { domainId: string }, from = '', to = '') {
+        const groups = await lessonGroups(domainId, this);
+        const fromDate = from ? lessonDate(from) : null;
+        const toDate = to ? lessonDate(to) : null;
+        const invalidRange = (!!from && !fromDate) || (!!to && !toDate)
+            || (!!fromDate && !!toDate && fromDate > toDate);
+        const filter: Record<string, any> = {
+            domainId,
+            group: { $in: groups.map((group) => group.name) },
+        };
+        if (!managesAllGroups(this.user)) filter.owner = this.user._id;
+        if (fromDate || toDate) {
+            filter.startAt = {};
+            if (fromDate) filter.startAt.$gte = fromDate;
+            if (toDate) filter.startAt.$lt = new Date(toDate.getTime() + 24 * 60 * 60 * 1000);
+        }
+        const docs = groups.length && !invalidRange
+            ? await db.collection(LESSON_COLL).find(filter).sort({ startAt: 1 }).limit(200).toArray()
+            : [];
+        const pids = [...new Set(docs.flatMap((doc) => doc.pids))];
+        const pdict = await ProblemModel.getList(domainId, pids, this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || this.user._id, false);
+        const lessons = docs.map((doc) => ({
+            id: doc._id.toHexString(), title: doc.title, group: doc.group,
+            start: lessonTimeText(doc.startAt).replace('T', ' '),
+            end: lessonTimeText(doc.endAt).replace('T', ' '), count: doc.pids.length,
+            preview: doc.pids.slice(0, 3).map((pid) => ({ pid, title: pdict[pid]?.title || `题目 #${pid}` })),
+        }));
+        const groupSections = groups.map((group) => ({
+            name: group.name,
+            lessons: lessons.filter((lesson) => lesson.group === group.name),
+        }));
+        this.view('dtoj_lesson_prep', {
+            groups: groupSections,
+            from, to, invalidRange,
+        });
+    }
+}
+
+class DtojLessonPrepNewHandler extends DtojDataHandler {
+    async get({ domainId }: { domainId: string }) {
+        const [groups, trainingOptions] = await Promise.all([lessonGroups(domainId, this), lessonTrainingOptions(domainId, this)]);
+        this.view('dtoj_lesson_prep_edit', { groups: groups.map((group) => group.name), trainingOptions, lesson: null });
+    }
+
+    @param('title', Types.String)
+    @param('group', Types.String)
+    @param('startAt', Types.String)
+    @param('endAt', Types.String)
+    @param('pids', Types.String, true)
+    @param('trainingChapter', Types.String, true)
+    async post(domainId: string, title: string, group: string, startAt: string, endAt: string, pids = '', trainingChapter = '') {
+        const groups = await lessonGroups(domainId, this);
+        if (!groups.some((item) => item.name === group)) throw new ValidationError('group');
+        const name = title.trim();
+        if (!name || name.length > 100) throw new ValidationError('title');
+        const start = lessonTime(startAt, 'startAt');
+        const end = lessonTime(endAt, 'endAt');
+        if (end <= start) throw new ValidationError('endAt');
+        const source = await lessonProblemSource(domainId, this, trainingChapter, pids);
+        const now = new Date();
+        await db.collection(LESSON_COLL).insertOne({
+            _id: new ObjectId(), domainId, owner: this.user._id, title: name, group,
+            startAt: start, endAt: end, pids: source.pids,
+            trainingId: source.trainingId, trainingNodeId: source.trainingNodeId,
+            createdAt: now, updatedAt: now,
+        });
+        this.response.redirect = this.url('dtoj_lesson_prep');
+    }
+}
+
+class DtojLessonPrepEditHandler extends DtojDataHandler {
+    @param('id', Types.ObjectId)
+    async get(domainId: string, id: ObjectId) {
+        const [doc, groups, trainingOptions] = await Promise.all([
+            lessonEditDoc(domainId, this, id), lessonGroups(domainId, this), lessonTrainingOptions(domainId, this),
+        ]);
+        this.view('dtoj_lesson_prep_edit', {
+            groups: groups.map((group) => group.name),
+            trainingOptions,
+            lesson: {
+                id: doc._id.toHexString(), title: doc.title, group: doc.group,
+                startAt: lessonTimeText(doc.startAt), endAt: lessonTimeText(doc.endAt), pids: doc.pids.join(','),
+                trainingChapter: doc.trainingId && doc.trainingNodeId ? `${doc.trainingId.toHexString()}:${doc.trainingNodeId}` : '',
+            },
+        });
+    }
+
+    @param('id', Types.ObjectId)
+    @param('title', Types.String)
+    @param('group', Types.String)
+    @param('startAt', Types.String)
+    @param('endAt', Types.String)
+    @param('pids', Types.String, true)
+    @param('trainingChapter', Types.String, true)
+    async post(domainId: string, id: ObjectId, title: string, group: string, startAt: string, endAt: string, pids = '', trainingChapter = '') {
+        await lessonEditDoc(domainId, this, id);
+        const groups = await lessonGroups(domainId, this);
+        if (!groups.some((item) => item.name === group)) throw new ValidationError('group');
+        const name = title.trim();
+        if (!name || name.length > 100) throw new ValidationError('title');
+        const start = lessonTime(startAt, 'startAt');
+        const end = lessonTime(endAt, 'endAt');
+        if (end <= start) throw new ValidationError('endAt');
+        const source = await lessonProblemSource(domainId, this, trainingChapter, pids);
+        await db.collection(LESSON_COLL).updateOne({ _id: id, domainId }, {
+            $set: {
+                title: name, group, startAt: start, endAt: end, pids: source.pids,
+                trainingId: source.trainingId, trainingNodeId: source.trainingNodeId, updatedAt: new Date(),
+            },
+        });
+        this.response.redirect = this.url('dtoj_lesson_prep');
+    }
+}
+
+class DtojLessonPrepDeleteHandler extends DtojDataHandler {
+    @param('id', Types.ObjectId)
+    async post(domainId: string, id: ObjectId) {
+        await lessonEditDoc(domainId, this, id);
+        await db.collection(LESSON_COLL).deleteOne({ _id: id, domainId });
+        this.response.redirect = this.url('dtoj_lesson_prep');
+    }
+}
+
 const nav: [string, string, string][] = [
     ['homepage', 'dtoj_home', '首页'],
     ['dtoj_problems', 'dtoj_problems', '题库'],
@@ -1027,6 +1373,9 @@ export async function apply(ctx: Context) {
         // 排在「评测记录」之后、「站内消息」之前（作业原先待的位置），与作业对调。
         before: 'home_messages',
     }, (handler: Handler) => handler.user.hasPriv(PRIV.PRIV_USER_PROFILE));
+    global.Hydro.ui.inject('Nav', 'dtoj_lesson_prep', {
+        prefix: 'dtoj_lesson_prep', displayName: '备课', before: 'home_messages',
+    }, (handler: Handler) => canManageGroups(handler.user));
     global.Hydro.ui.inject('Nav', 'domain_dashboard', { prefix: 'domain', displayName: '管理域' }, PERM.PERM_EDIT_DOMAIN);
 
     // 教师的「管理域」。教师没有 PERM_EDIT_DOMAIN，进不了 core 的 /domain/dashboard，
@@ -1059,6 +1408,9 @@ export async function apply(ctx: Context) {
     ctx.i18n.load('zh', { dtoj_courseware: '课件' });
     ctx.i18n.load('zh_TW', { dtoj_courseware: '課件' });
     ctx.i18n.load('en', { dtoj_courseware: 'Courseware' });
+    ctx.i18n.load('zh', { dtoj_lesson_prep: '备课' });
+    ctx.i18n.load('zh_TW', { dtoj_lesson_prep: '備課' });
+    ctx.i18n.load('en', { dtoj_lesson_prep: 'Lesson prep' });
     ctx.i18n.load('zh', { 'Student note': '学生备注', 'Search UID, username, or note': '搜索 UID、用户名或备注' });
     ctx.i18n.load('zh_TW', { 'Student note': '學生備註', 'Search UID, username, or note': '搜尋 UID、使用者名稱或備註' });
     ctx.i18n.load('en', { 'Student note': 'Student note', 'Search UID, username, or note': 'Search UID, username, or note' });
@@ -1080,6 +1432,11 @@ export async function apply(ctx: Context) {
 
     // 顶栏未读角标切回前台时的对账接口，见 DtojUnreadHandler
     ctx.Route('dtoj_unread', '/dtoj/unread', DtojUnreadHandler, PRIV.PRIV_USER_PROFILE);
+
+    ctx.Route('dtoj_lesson_prep', '/lesson-prep', DtojLessonPrepHandler, PRIV.PRIV_USER_PROFILE);
+    ctx.Route('dtoj_lesson_prep_new', '/lesson-prep/new', DtojLessonPrepNewHandler, PRIV.PRIV_USER_PROFILE);
+    ctx.Route('dtoj_lesson_prep_edit', '/lesson-prep/:id/edit', DtojLessonPrepEditHandler, PRIV.PRIV_USER_PROFILE);
+    ctx.Route('dtoj_lesson_prep_delete', '/lesson-prep/:id/delete', DtojLessonPrepDeleteHandler, PRIV.PRIV_USER_PROFILE);
 
     // 作业列表按「只看自己的作业」重写过滤条件，见 DtojHomeworkMainHandler
     ctx.Route('homework_main', '/homework', DtojHomeworkMainHandler, PERM.PERM_VIEW_HOMEWORK);

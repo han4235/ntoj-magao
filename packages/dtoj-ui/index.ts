@@ -944,7 +944,6 @@ const nav: [string, string, string][] = [
     ['contest_main', 'dtoj_contest', '比赛'],
     ['record_main', 'dtoj_record', '评测记录'],
     ['home_messages', 'home_messages', '站内消息'],
-    ['dtoj_rank', 'dtoj_rank', '等级分'],
     ['dtoj_community', 'dtoj_community', '社区'],
     ['discussion_main', 'dtoj_discuss', '讨论'],
     ['dtoj_shop', 'dtoj_shop', '神秘商店'],

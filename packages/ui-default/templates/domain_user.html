@@ -3,6 +3,7 @@
 {% block domain_content %}
 {{ set(UiContext, 'roles', roles.map(eval('(i) => i._id'))) }}
 {{ set(UiContext, 'canForceJoin', model.system.get('server.allowInvite') or handler.user.hasPriv(PRIV.PRIV_MANAGE_ALL_DOMAIN)) }}
+{{ set(UiContext, 'studentNoteUrl', url('dtoj_student_note')) }}
 {% set _rolesSelect = roles.filter(eval("(i) => i._id !== 'guest'")).map(eval('(role) => [role._id, role._id]')) %}
 <style>
   .page--domain_user .domain-users table.data-table {
@@ -53,24 +54,34 @@
   .page--domain_user .domain-user-actions .button.rounded.compact:hover {
     transform: none;
   }
+  .page--domain_user .col--student-note { min-width: 220px; }
+  .page--domain_user .domain-student-note__inline { margin-left: 5px; color: var(--muted, #6b7280); font-size: 12px; }
+  .page--domain_user .domain-student-note__view,
+  .page--domain_user .domain-student-note__editor { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .page--domain_user .domain-student-note__value { min-width: 0; overflow-wrap: anywhere; }
+  .page--domain_user .domain-student-note__view[hidden],
+  .page--domain_user .domain-student-note__editor[hidden] { display: none; }
+  .page--domain_user .domain-student-note__input { box-sizing: border-box; flex: 1 1 100%; min-width: 90px; width: 100%; min-height: 32px; }
+  .page--domain_user .domain-student-note__status { display: block; min-height: 1em; color: var(--muted, #6b7280); font-size: 12px; }
 </style>
 <div class="section">
   <div class="section__header">
     <h1 class="section__title">{{ _('{0}: Users').format(domain.name) }}</h1>
   </div>
   <div class="domain-users__toolbar">
-    <input type="search" class="textbox rounded domain-users__search" name="user_search" placeholder="{{ _('Search users') }}" autocomplete="off">
+    <input type="search" class="textbox rounded domain-users__search" name="user_search" placeholder="{{ _('Search UID, username, or note') }}" autocomplete="off">
     <button type="button" class="primary rounded button" name="add_user">{{ _('Add User') }}</button>
     <span class="domain-users__page-meta">{{ _('{0} users total').format(ucount) }}</span>
   </div>
   {% set _userListQs = ('sortRole=' + sortRole) if sortRole else '' %}
   {{ noscript_note.render() }}
   <div class="section__body no-padding domain-users">
-    <table class="data-table">
+    <table class="data-table" data-student-note-url="{{ url('dtoj_student_note') }}">
       <colgroup>
         <col class="col--checkbox">
         <col class="col--uid">
         <col class="col--user">
+        <col class="col--student-note" style="width:220px">
         <col class="col--role">
         <col class="col--actions" style="width:280px">
       </colgroup>
@@ -83,6 +94,7 @@
           </th>
           <th class="col--uid">{{ _('User ID') }}</th>
           <th class="col--user">{{ _('Username') }}</th>
+          <th class="col--student-note">{{ _('Student note') }}</th>
           <th class="col--role domain-users__sort-role" tabindex="0" title="{{ _('Sort by role') }}">
             {{ _('Role') }}
             <span class="domain-users__sort-indicator" aria-hidden="true">{% if sortRole == 'asc' %} ↑{% elif sortRole == 'desc' %} ↓{% endif %}</span>
@@ -93,7 +105,7 @@
       <tbody>
         {%- for rudoc in udocs -%}
         {% set is_disabled=(rudoc._id == handler.user._id) %}
-        <tr data-uid="{{ rudoc._id }}" data-role="{{ rudoc.role }}">
+        <tr data-uid="{{ rudoc._id }}" data-role="{{ rudoc.role }}" data-student-note="{{ rudoc.studentNote or '' }}">
           <td class="col--checkbox">
             <label class="compact checkbox">
               <input type="checkbox" data-checkbox-group="user" {% if is_disabled %}disabled{% else %}data-checkbox-range{% endif %}>
@@ -104,7 +116,22 @@
           </td>
           <td class="col--user">
             {{ user.render_inline(rudoc, badge=false) }}
+            {% if rudoc.role == studentRole and rudoc.studentNote %}<span class="domain-student-note__inline" data-student-note-inline>（{{ rudoc.studentNote }}）</span>{% endif %}
             {% if not rudoc.join %}<span class="text-orange">({{ _('Not joined yet') }})</span>{% endif %}
+          </td>
+          <td class="col--student-note" data-student-note-cell>
+            {% if rudoc.role == studentRole %}
+            <div class="domain-student-note__view">
+              <span class="domain-student-note__value" data-note-value>{{ rudoc.studentNote or '—' }}</span>
+              <button type="button" class="rounded compact button" data-note-action="edit">{{ _('Edit') }}</button>
+            </div>
+            <div class="domain-student-note__editor" hidden>
+              <input class="textbox rounded domain-student-note__input" type="text" maxlength="40" value="{{ rudoc.studentNote or '' }}" data-note-input aria-label="{{ _('Student note') }}">
+              <button type="button" class="rounded compact button" data-note-action="save">{{ _('Save') }}</button>
+              <button type="button" class="rounded compact button" data-note-action="cancel">{{ _('Cancel') }}</button>
+            </div>
+            <span class="domain-student-note__status" data-note-status aria-live="polite"></span>
+            {% else %}—{% endif %}
           </td>
           <td class="col--role">
             <span class="domain-user-role__text">{{ rudoc.role }}</span>

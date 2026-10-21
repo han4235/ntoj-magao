@@ -376,6 +376,7 @@
   }
   .dtoj-hw-view .dtoj-hw-rowstate.is-todo { background: #6a4b00; color: #f8f1dc; }
   .dtoj-hw-view .dtoj-hw-rowstate.is-done { background: #eef1f5; color: #4b5563; }
+  .dtoj-hw-view .dtoj-hw-student-note { margin-left: 4px; color: var(--muted); font-size: 12px; }
 
   /* 作业答疑：提问框与往返记录 */
   .dtoj-hw-view .dtoj-hw-ask { display: flex; flex-direction: column; gap: 10px; }
@@ -707,6 +708,7 @@
                       {% if hwProgress.udict[row.uid] %}
                       {{ user.render_inline(hwProgress.udict[row.uid], badge=false) }}
                       {% else %}#{{ row.uid }}{% endif %}
+                      {% if hwProgress.studentNotes[row.uid] %}<span class="dtoj-hw-student-note">（{{ hwProgress.studentNotes[row.uid] }}）</span>{% endif %}
                       {# 名单上还没认领的也要列出来，老师才知道该催谁 #}
                       {% if hwProgress.rosterSize is not none %}
                       <span class="dtoj-hw-rowstate {{ 'is-done' if row.attended else 'is-todo' }}">{{ '已认领' if row.attended else '待认领' }}</span>

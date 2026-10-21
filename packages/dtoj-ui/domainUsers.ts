@@ -1,5 +1,5 @@
 import {
-    DomainModel, PERM, PRIV, SystemModel, Types, UserModel,
+    DomainModel, ForbiddenError, PERM, PRIV, SystemModel, Types, UserModel, ValidationError,
 } from 'hydrooj';
 import { HIDDEN_DOMAIN_USER_IDS } from './userGroups';
 
@@ -27,16 +27,18 @@ export interface StudentRow {
     uid: number;
     uname: string;
     name: string;
+    note: string;
     studentId?: string;
 }
 
-/** 本域的学生账号，按显示名排。q 命中姓名或账号的一部分即留下。 */
+/** 本域的学生账号，按显示名排；q 可匹配姓名、账号、UID 或备注。 */
 export async function listStudents(domainId: string, q = '') {
     const dudocs = await DomainModel.getMultiUserInDomain(domainId, {
         join: true,
         role: studentRoleName(),
     }).toArray();
     const uids = dudocs.map((dudoc) => dudoc.uid);
+    const notes = new Map(dudocs.map((dudoc) => [dudoc.uid, String(dudoc.studentNote || '')]));
     const udict = await UserModel.getList(domainId, uids);
     const needle = q.trim().toLowerCase();
     return uids
@@ -47,12 +49,46 @@ export async function listStudents(domainId: string, q = '') {
             uid: udoc._id,
             uname: udoc.uname,
             name: udoc.displayName || udoc.uname,
+            note: notes.get(udoc._id) || '',
             studentId: udoc.studentId,
         }))
         .filter((row) => !needle
             || row.name.toLowerCase().includes(needle)
-            || row.uname.toLowerCase().includes(needle))
+            || row.uname.toLowerCase().includes(needle)
+            || String(row.uid).includes(needle)
+            || row.note.toLowerCase().includes(needle))
         .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+}
+
+/** 当前域内学生的教师备注，供教师可见的进度/评测列表复用。 */
+export async function studentNotesForUsers(domainId: string, uids: number[]): Promise<Record<number, string>> {
+    const wanted = [...new Set(uids.filter((uid) => Number.isSafeInteger(uid) && uid > 0))];
+    if (!wanted.length) return {};
+    const dudocs = await DomainModel.getMultiUserInDomain(domainId, {
+        uid: { $in: wanted },
+        role: studentRoleName(),
+        join: true,
+    }).project({ uid: 1, studentNote: 1 }).toArray();
+    const notes: Record<number, string> = {};
+    for (const dudoc of dudocs) {
+        const note = String(dudoc.studentNote || '').trim();
+        if (note) notes[dudoc.uid] = note;
+    }
+    return notes;
+}
+
+/** 给本域学生保存老师备注；不修改账号全站的 displayName。 */
+export async function setStudentNote(domainId: string, uid: number, rawNote: string) {
+    const note = String(rawNote || '').trim();
+    if (Array.from(note).length > 40) throw new ValidationError('note');
+    const isStudent = await DomainModel.getMultiUserInDomain(domainId, {
+        uid,
+        role: studentRoleName(),
+        join: true,
+    }).limit(1).hasNext();
+    if (!isStudent) throw new ForbiddenError();
+    await DomainModel.setUserInDomain(domainId, uid, { studentNote: note });
+    return note;
 }
 
 /** 邮箱按用户名派生，和 core 建号那套一致；撞了往后加序号。 */

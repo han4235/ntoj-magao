@@ -20,11 +20,13 @@ import {
     managesAllGroups, memberNames, myGroupNames, ownsGroup,
 } from './userGroups';
 import {
-    CreateStudentsResult, createStudents, initStudentPasswords, listStudents,
+    CreateStudentsResult, createStudents, initStudentPasswords, listStudents, setStudentNote,
+    studentNotesForUsers,
     STUDENT_DEFAULT_PASSWORD, studentRoleName,
 } from './domainUsers';
 
 export { hasHomeworkSubmission, myAttendedHomeworkIds, myHomeworkGroups, myPendingHomework } from './homeworkScope';
+export { studentNotesForUsers } from './domainUsers';
 
 /** 交过题的作业不给撤认领，见 DtojHomeworkUnclaimHandler 与 hasHomeworkSubmission。 */
 export const HomeworkSubmittedError = Err(
@@ -813,6 +815,22 @@ class DtojDomainUserHandler extends DtojDataHandler {
     }
 }
 
+/** 老师和域管理员都能维护本域学生备注；权限与目标学生身份在服务端重新核验。 */
+class DtojStudentNoteHandler extends DtojDataHandler {
+    noCheckPermView = true;
+
+    @param('uid', Types.PositiveInt)
+    @param('note', Types.String, true)
+    async post(domainId: string, uid: number, note = '') {
+        if (!this.user.hasPerm(PERM.PERM_MANAGE_STUDENT, PERM.PERM_EDIT_DOMAIN)) {
+            throw new PermissionError(PERM.PERM_MANAGE_STUDENT);
+        }
+        const saved = await setStudentNote(domainId, uid, note);
+        await OplogModel.log(this, 'dtoj.domain.setStudentNote', { domainId, uid });
+        this.response.body = { ok: true, note: saved };
+    }
+}
+
 /**
  * 供课件系统（ppt-system）确认「当前来访者是谁」。
  *
@@ -1010,6 +1028,10 @@ export async function apply(ctx: Context) {
     ctx.i18n.load('zh', { dtoj_courseware: '课件' });
     ctx.i18n.load('zh_TW', { dtoj_courseware: '課件' });
     ctx.i18n.load('en', { dtoj_courseware: 'Courseware' });
+    ctx.i18n.load('zh', { 'Student note': '学生备注', 'Search UID, username, or note': '搜索 UID、用户名或备注' });
+    ctx.i18n.load('zh_TW', { 'Student note': '學生備註', 'Search UID, username, or note': '搜尋 UID、使用者名稱或備註' });
+    ctx.i18n.load('en', { 'Student note': 'Student note', 'Search UID, username, or note': 'Search UID, username, or note' });
+    ctx.i18n.load('ko', { 'Student note': '학생 메모', 'Search UID, username, or note': 'UID, 사용자 이름 또는 메모 검색' });
     // 教师域管理侧栏的两项（名字与 core 侧栏保持同一套说法）
     ctx.i18n.load('zh', { dtoj_group: '管理小组' });
     ctx.i18n.load('zh_TW', { dtoj_group: '管理小組' });
@@ -1052,6 +1074,8 @@ export async function apply(ctx: Context) {
     // 教师的「管理用户」，见 DtojDomainUserHandler。挂 PERM_MANAGE_STUDENT：
     // 这个权限位只够看学生、建学生、重置学生密码，拿不到改角色和域设置。
     ctx.Route('dtoj_domain_user', '/domain/student', DtojDomainUserHandler, PERM.PERM_MANAGE_STUDENT);
+    // 备注写入口允许教师或域管理员；Handler 内部仍会核验目标是当前域的学生。
+    ctx.Route('dtoj_student_note', '/dtoj/student-note', DtojStudentNoteHandler);
 
     // 题目页侧栏的「添加作业」，见 DtojProblemAddHomeworkHandler
     ctx.Route(
@@ -1106,9 +1130,15 @@ export async function apply(ctx: Context) {
         // 老师/管理员还要看得到全班每道题的通过情况，不只是自己的
         if (!canManage && !that.user.hasPerm(PERM.PERM_VIEW_HOMEWORK_HIDDEN_SCOREBOARD)) return;
         const progress = await listHomeworkProgress(tdoc.domainId, tdoc, stat?.roster);
+        const progressUids = progress.rows.map((row) => row.uid);
+        const [udict, studentNotes] = await Promise.all([
+            UserModel.getListForRender(tdoc.domainId, progressUids, false),
+            canManage ? studentNotesForUsers(tdoc.domainId, progressUids) : Promise.resolve({}),
+        ]);
         body.hwProgress = {
             ...progress,
-            udict: await UserModel.getListForRender(tdoc.domainId, progress.rows.map((row) => row.uid), false),
+            udict,
+            studentNotes,
         };
     });
 

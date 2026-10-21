@@ -44,9 +44,11 @@
   /* 列宽得自己定：core 那套列宽（.page--domain_user 下的 .col--uid 等）挂在别的 page_name 上，
      本页一条都拿不到，浏览器就按内容瞎分——复选框列和 UID 列各撑出半屏空白，
      名字和按钮被顶到两头。走 colgroup + fixed，列宽才由这儿说了算。 */
+  .dtoj-domain-main .dtoj-students { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .dtoj-domain-main .dtoj-students .data-table { table-layout: fixed; }
   .dtoj-domain-main .dtoj-students .data-table col.col--checkbox { width: 46px; }
   .dtoj-domain-main .dtoj-students .data-table col.col--uid { width: 88px; }
+  .dtoj-domain-main .dtoj-students .data-table col.col--note { width: 220px; }
   /* ui-default 里有一条全局的 .col--actions { width: 300px }，一行按钮用不了那么宽 */
   .dtoj-domain-main .dtoj-students .data-table col.col--actions { width: 136px; }
   .dtoj-domain-main .dtoj-students .data-table th.col--checkbox,
@@ -70,6 +72,16 @@
   .dtoj-domain-main .dtoj-students input[type=checkbox] { border-radius: 5px; border-color: #c5d4e8; }
   .dtoj-students__name { display: block; font-weight: 600; }
   .dtoj-students__sub { display: block; margin: 2px 0 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .dtoj-students__inline-note { margin-left: 4px; color: var(--muted); font-size: 12px; font-weight: 500; }
+  .dtoj-students__note-cell { min-width: 220px; }
+  .dtoj-students__note-view,
+  .dtoj-students__note-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .dtoj-students__note-value { min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
+  .dtoj-students__note-view[hidden],
+  .dtoj-students__note-edit[hidden] { display: none; }
+  .dtoj-students__note-input { box-sizing: border-box; flex: 1 1 100%; min-width: 90px; width: 100%; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .dtoj-students__note-edit .button.rounded { min-height: 32px; height: 32px; padding: 0 10px; font-size: 13px; }
+  .dtoj-students__note-status { display: block; min-height: 1em; color: var(--muted); font-size: 12px; }
   .dtoj-students__acts { white-space: nowrap; }
   /* 行内按钮比页面顶部那些小一号：它在一行里挤着，没必要 40px 高 */
   .dtoj-domain-main .dtoj-students__acts .button.rounded {
@@ -89,7 +101,7 @@
     <h1 class="section__title">{{ _('domain_user') }} · {{ domain.name }}</h1>
     <div class="section__tools dtoj-students__tools">
       <form method="get" action="{{ url('dtoj_domain_user') }}">
-        <input type="search" class="dtoj-students__search" name="q" value="{{ q }}" placeholder="搜姓名或账号" autocomplete="off">
+        <input type="search" class="dtoj-students__search" name="q" value="{{ q }}" placeholder="搜姓名、账号或备注" autocomplete="off">
         <button type="submit" class="rounded button">搜索</button>
         {% if q %}<a href="{{ url('dtoj_domain_user') }}" class="rounded button">清空</a>{% endif %}
       </form>
@@ -125,11 +137,12 @@
     <input type="hidden" name="operation" value="init_password">
     {% if rows.length %}
     <div class="section__body no-padding dtoj-students">
-      <table class="data-table">
+      <table class="data-table" data-student-note-url="{{ url('dtoj_student_note') }}">
         <colgroup>
           <col class="col--checkbox">
           <col class="col--uid">
           <col class="col--user">
+          <col class="col--note">
           <col class="col--actions">
         </colgroup>
         <thead>
@@ -141,12 +154,13 @@
             </th>
             <th class="col--uid">{{ _('User ID') }}</th>
             <th class="col--user">{{ _('Username') }}</th>
+            <th class="col--note">{{ _('Student note') }}</th>
             <th class="col--actions"></th>
           </tr>
         </thead>
         <tbody>
           {%- for row in rows -%}
-          <tr data-uid="{{ row.uid }}">
+          <tr data-uid="{{ row.uid }}" data-student-note="{{ row.note }}">
             <td class="col--checkbox">
               <label class="compact checkbox">
                 <input type="checkbox" name="uids" value="{{ row.uid }}" data-student-checkbox>
@@ -154,8 +168,20 @@
             </td>
             <td class="col--uid">{{ row.uid }}</td>
             <td class="col--user">
-              <span class="dtoj-students__name">{{ row.name }}</span>
-              {% if row.name != row.uname %}<em class="dtoj-students__sub">{{ row.uname }}</em>{% endif %}
+              <span class="dtoj-students__name">{{ row.uname }}{% if row.note %}<span class="dtoj-students__inline-note" data-student-note-inline>（{{ row.note }}）</span>{% endif %}</span>
+              {% if row.name != row.uname %}<em class="dtoj-students__sub">{{ row.name }}</em>{% endif %}
+            </td>
+            <td class="col--note dtoj-students__note-cell" data-student-note-cell>
+              <div class="dtoj-students__note-view">
+                <span class="dtoj-students__note-value" data-note-value>{{ row.note or '—' }}</span>
+                <button type="button" class="rounded button" data-note-action="edit">{{ _('Edit') }}</button>
+              </div>
+              <div class="dtoj-students__note-edit" hidden>
+                <input class="dtoj-students__note-input" type="text" maxlength="40" value="{{ row.note }}" data-note-input aria-label="{{ _('Student note') }}">
+                <button type="button" class="rounded button" data-note-action="save">{{ _('Save') }}</button>
+                <button type="button" class="rounded button" data-note-action="cancel">{{ _('Cancel') }}</button>
+              </div>
+              <span class="dtoj-students__note-status" data-note-status aria-live="polite"></span>
             </td>
             <td class="col--actions dtoj-students__acts">
               <button type="button" class="rounded button" data-init-one="{{ row.uid }}">{{ _('Initialize password') }}</button>
@@ -171,7 +197,7 @@
     {% else %}
     <div class="section__body">
       <p class="dtoj-students__empty">
-        {% if q %}没有名字里带「{{ q }}」的学生。{% else %}本域还没有学生账号。上面「添加学生」里粘一批账号就能建。{% endif %}
+        {% if q %}没有姓名、账号或备注包含「{{ q }}」的学生。{% else %}本域还没有学生账号。上面「添加学生」里粘一批账号就能建。{% endif %}
       </p>
     </div>
     {% endif %}
@@ -186,6 +212,7 @@
   var boxes = function () { return Array.prototype.slice.call(form.querySelectorAll('[data-student-checkbox]')); };
   var selectAll = document.getElementById('dtoj-students-select-all');
   var INIT_PASSWORD = {{ defaultPassword|json|safe }};
+  var table = form.querySelector('.dtoj-students .data-table');
 
   if (selectAll) {
     selectAll.addEventListener('change', function () {
@@ -207,6 +234,87 @@
     box.checked = true;
     form.submit();
   });
+
+  if (table) {
+    table.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-note-action]');
+      if (!button) return;
+      var cell = button.closest('[data-student-note-cell]');
+      var row = button.closest('tr[data-uid]');
+      if (!cell || !row) return;
+      var view = cell.querySelector('.dtoj-students__note-view');
+      var editor = cell.querySelector('.dtoj-students__note-edit');
+      var input = cell.querySelector('[data-note-input]');
+      var status = cell.querySelector('[data-note-status]');
+      var action = button.getAttribute('data-note-action');
+      if (action === 'edit') {
+        status.textContent = '';
+        editor.hidden = false;
+        view.hidden = true;
+        input.focus();
+        return;
+      }
+      if (action === 'cancel') {
+        input.value = row.getAttribute('data-student-note') || '';
+        editor.hidden = true;
+        view.hidden = false;
+        status.textContent = '';
+        return;
+      }
+      if (action !== 'save') return;
+      if (!window.jQuery) {
+        status.textContent = '保存失败，请刷新页面后重试。';
+        return;
+      }
+      button.disabled = true;
+      status.textContent = '正在保存…';
+      window.jQuery.ajax({
+        url: table.getAttribute('data-student-note-url'),
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ uid: Number(row.getAttribute('data-uid')), note: input.value }),
+        headers: { Accept: 'application/json' },
+      }).done(function (result) {
+        var note = String((result && result.note) || '');
+        row.setAttribute('data-student-note', note);
+        input.value = note;
+        cell.querySelector('[data-note-value]').textContent = note || '—';
+        var name = row.querySelector('.dtoj-students__name');
+        var inline = name.querySelector('[data-student-note-inline]');
+        if (note && !inline) {
+          inline = document.createElement('span');
+          inline.className = 'dtoj-students__inline-note';
+          inline.setAttribute('data-student-note-inline', '');
+          name.appendChild(inline);
+        }
+        if (inline) {
+          if (note) inline.textContent = '（' + note + '）';
+          else inline.remove();
+        }
+        editor.hidden = true;
+        view.hidden = false;
+        status.textContent = '已保存';
+        var query = new URLSearchParams(window.location.search).get('q') || '';
+        var searchText = ((row.querySelector('.col--user') || {}).textContent || '') + ' ' + note;
+        row.hidden = !!query && searchText.toLowerCase().indexOf(query.toLowerCase()) < 0;
+      }).fail(function (xhr) {
+        var message = xhr.responseJSON && xhr.responseJSON.error && xhr.responseJSON.error.message;
+        status.textContent = message || '保存失败，请重试。';
+      }).always(function () {
+        button.disabled = false;
+      });
+    });
+
+    table.addEventListener('keydown', function (event) {
+      if (!event.target.matches('[data-note-input]')) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.target.closest('[data-student-note-cell]').querySelector('[data-note-action="save"]').click();
+      } else if (event.key === 'Escape') {
+        event.target.closest('[data-student-note-cell]').querySelector('[data-note-action="cancel"]').click();
+      }
+    });
+  }
 })();
 </script>
 {% endblock %}

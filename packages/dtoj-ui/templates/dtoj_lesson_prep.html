@@ -1,0 +1,258 @@
+{% set page_name = 'dtoj_lesson_prep' %}
+{% extends "layout/basic.html" %}
+{% block content %}
+{% include "dtoj_style.html" %}
+<style>
+  .dtoj-prep-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .dtoj-prep-head h1 {
+    margin: 0;
+    color: var(--ink);
+    font: 760 clamp(32px, 4vw, 48px)/1.16 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
+    letter-spacing: -0.04em;
+  }
+  .dtoj-prep-head p { max-width: 42rem; margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .dtoj-prep-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .dtoj-prep-range { display: flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; }
+  .dtoj-prep-filter input {
+    box-sizing: border-box;
+    flex: 0 1 176px;
+    width: 176px;
+    min-width: 0;
+    height: 40px;
+    padding: 0 9px;
+    border: 1px solid rgba(30, 41, 59, 0.12);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color-scheme: light;
+  }
+  .dtoj-prep-filter input:focus-visible { border-color: var(--brand); outline: 3px solid rgba(37, 99, 235, 0.2); outline-offset: 1px; }
+  .dtoj-prep-range-sep { flex: none; color: var(--muted); }
+  .dtoj-prep-filter button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, .16);
+    cursor: pointer;
+    transition: background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  }
+  .dtoj-prep-filter button:hover { background: var(--brand-deep); box-shadow: 0 6px 14px rgba(37, 99, 235, .2); }
+  .dtoj-prep-filter button:active { transform: translateY(1px); }
+  .dtoj-prep-filter :focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+  .dtoj-prep-filter-error { margin: 10px 0 0; color: #8a1f1f; font-size: 13px; }
+  .dtoj-prep-group-section { margin-top: 26px; scroll-margin-top: 72px; }
+  .dtoj-prep-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+  .dtoj-prep-group-heading h2 { margin: 0; color: var(--ink); font-size: 18px; font-weight: 800; letter-spacing: -0.025em; overflow-wrap: anywhere; }
+  .dtoj-prep-group-heading span { flex: none; color: var(--muted); font-size: 12px; font-weight: 700; }
+  .dtoj-prep-group-empty { margin-top: 14px; padding: 14px 16px; border: 1px dashed rgba(30, 41, 59, 0.18); border-radius: 10px; background: rgba(255, 255, 255, 0.62); color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .dtoj-prep-head a.dtoj-prep-action,
+  .dtoj-prep-head a.dtoj-prep-action:link,
+  .dtoj-prep-head a.dtoj-prep-action:visited,
+  .dtoj-prep-head a.dtoj-prep-action:hover,
+  .dtoj-prep-head a.dtoj-prep-action:active,
+  .dtoj-prep-empty a.dtoj-prep-action,
+  .dtoj-prep-empty a.dtoj-prep-action:link,
+  .dtoj-prep-empty a.dtoj-prep-action:visited,
+  .dtoj-prep-empty a.dtoj-prep-action:hover,
+  .dtoj-prep-empty a.dtoj-prep-action:active {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 11px;
+    background: #fff;
+    color: var(--brand-deep);
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .dtoj-prep-action:focus-visible,
+  .dtoj-prep-card a:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.45); outline-offset: 2px; }
+  .dtoj-prep-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; scroll-margin-top: 64px; }
+  @media (min-width: 1180px) { .dtoj-prep-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .dtoj-prep-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    border: 1px solid rgba(30, 41, 59, 0.08);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 22px rgba(28, 39, 64, 0.08);
+    transition: transform 0.18s ease-out;
+  }
+  .dtoj-prep-card:hover { transform: translateY(-1px); }
+  .dtoj-prep-card-head {
+    position: relative;
+    display: flex;
+    min-height: 92px;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px 11px;
+    color: #fff;
+    background: linear-gradient(160deg, #1e1b4b 0%, #312e81 46%, #1e40af 100%);
+  }
+  .dtoj-prep-card:nth-child(3n+2) .dtoj-prep-card-head { background: linear-gradient(160deg, #042f2e 0%, #115e59 50%, #0f766e 100%); }
+  .dtoj-prep-card:nth-child(3n) .dtoj-prep-card-head { background: linear-gradient(160deg, #0f172a 0%, #1e3a8a 54%, #1d4ed8 100%); }
+  .dtoj-prep-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .dtoj-prep-lines path { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.2; }
+  .dtoj-prep-card-kicker,
+  .dtoj-prep-card-head h2 { position: relative; }
+  .dtoj-prep-card-kicker { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .dtoj-prep-group {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 9px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.35;
+  }
+  .dtoj-prep-card-count { color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .dtoj-prep-card-head h2 {
+    margin: 0;
+    color: #fff;
+    font: 800 17px/1.22 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif;
+    letter-spacing: -0.03em;
+    overflow-wrap: anywhere;
+  }
+  .dtoj-prep-card-body { display: flex; flex: 1; flex-direction: column; gap: 6px; min-height: 190px; padding: 9px 12px 8px; }
+  .dtoj-prep-time {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #f4f7fb;
+  }
+  .dtoj-prep-time-point { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .dtoj-prep-time-point span { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .dtoj-prep-time-point time { min-width: 0; color: var(--ink); font-size: 11px; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; text-align: right; }
+  .dtoj-prep-problems { margin: 2px 0 0; }
+  .dtoj-prep-problems-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .dtoj-prep-problems-head h3 { margin: 0; color: var(--ink); font-size: 12px; font-weight: 800; letter-spacing: -0.02em; }
+  .dtoj-prep-problems-head span { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .dtoj-prep-problems ol { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+  .dtoj-prep-problems li { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
+  .dtoj-prep-problem-n { flex: none; color: var(--brand-deep); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+  .dtoj-prep-problems li a { min-width: 0; overflow: hidden; color: #3e4c63; font-size: 12px; line-height: 1.35; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; text-underline-offset: 3px; }
+  .dtoj-prep-problems li a:hover { text-decoration: underline; }
+  .dtoj-prep-more { margin: 4px 0 0 20px; color: var(--muted); font-size: 11px; }
+  .dtoj-prep-card footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); color: #3e4c63; font-size: 12px; }
+  .dtoj-prep-card footer a { display: inline-flex; align-items: center; gap: 3px; color: var(--brand-deep); font-size: 12px; font-weight: 700; text-decoration: none; }
+  .dtoj-prep-card footer a svg { width: 14px; height: 14px; }
+  .dtoj-prep-empty {
+    display: flex;
+    min-height: 300px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 22px rgba(28, 39, 64, 0.08);
+    text-align: center;
+  }
+  .dtoj-prep-empty-mark { display: grid; width: 52px; height: 52px; place-items: center; margin-bottom: 18px; border-radius: 14px; background: #e7f0f6; color: var(--brand-deep); }
+  .dtoj-prep-empty-mark svg { width: 26px; height: 26px; }
+  .dtoj-prep-empty h2 { margin: 0; color: var(--ink); font: 800 22px/1.3 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif; letter-spacing: -0.04em; }
+  .dtoj-prep-empty p { max-width: 52ch; margin: 8px 0 20px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+  .dtoj-prep-empty a:focus-visible { outline: 3px solid rgba(47, 93, 130, 0.35); outline-offset: 3px; }
+  @media (max-width: 980px) { .dtoj-prep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 680px) { .dtoj-prep-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .dtoj-prep-head { align-items: stretch; flex-direction: column; gap: 16px; }
+    .dtoj-prep-head p { margin-top: 8px; }
+    .dtoj-prep-head a.dtoj-prep-action { align-self: flex-start; }
+    .dtoj-prep-filter { align-items: flex-start; flex-direction: column; gap: 10px; }
+    .dtoj-prep-range { width: 100%; }
+    .dtoj-prep-filter input { flex: 1 1 0; width: 0; }
+    .dtoj-prep-empty { min-height: 240px; }
+  }
+</style>
+<div class="row">
+  <div class="medium-12 columns dtoj-page dtoj-home">
+  <div class="dtoj-shell dtoj-prep">
+  <header class="dtoj-prep-head">
+    <div><h1>备课</h1><p>为一个班级安排一节课的时间和题单。课时开始后会自动向所属小组开放为课堂练习，结束后自动收起。</p></div>
+    {% if groups.length %}<a class="dtoj-prep-action" href="{{ url('dtoj_lesson_prep_new') }}">新建课时</a>{% endif %}
+  </header>
+  {% if not groups.length %}
+    <div class="dtoj-prep-empty">
+      <span class="dtoj-prep-empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5h6.5a3 3 0 0 1 3 3v11a3 3 0 0 0-3-3H4zM20 5.5h-3.5a3 3 0 0 0-3 3v11a3 3 0 0 1 3-3H20z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+      <h2>先准备一个班级</h2><p>创建或加入你负责的小组后，就可以为班级安排课时和题单。</p><a class="dtoj-prep-action" href="{{ url('dtoj_group') }}">管理小组</a>
+    </div>
+  {% else %}
+    <form class="dtoj-prep-filter" method="get" action="{{ url('dtoj_lesson_prep') }}">
+      <div class="dtoj-prep-range" role="group" aria-label="备课日期范围">
+        <input type="date" name="from" value="{{ from }}" aria-label="开始日期">
+        <span class="dtoj-prep-range-sep" aria-hidden="true">—</span>
+        <input type="date" name="to" value="{{ to }}" aria-label="结束日期">
+      </div>
+      <button type="submit">筛选</button>
+    </form>
+    {% if invalidRange %}<p class="dtoj-prep-filter-error" role="alert">日期范围无效，请检查日期格式，并确保开始日期不晚于结束日期。</p>{% endif %}
+    {% for group in groups %}
+    <section class="dtoj-prep-group-section" aria-labelledby="dtoj-prep-group-{{ loop.index }}">
+      <header class="dtoj-prep-group-heading"><h2 id="dtoj-prep-group-{{ loop.index }}">{{ group.name }}</h2><span>{{ group.lessons.length }} 节备课</span></header>
+      {% if group.lessons.length %}<div class="dtoj-prep-grid">
+      {% for lesson in group.lessons %}
+      <article class="dtoj-prep-card">
+        <header class="dtoj-prep-card-head">
+          <svg class="dtoj-prep-lines" viewBox="0 0 320 180" aria-hidden="true"><path d="M-10 40c70 36 120 8 190-28s90-20 150 8"/><path d="M40 -20c30 70 20 110-10 170"/><path d="M210 8c48 42 70 30 120-16"/><path d="M250 50c36 48 28 90 8 140"/></svg>
+          <div class="dtoj-prep-card-kicker"><span class="dtoj-prep-group">{{ lesson.group }}</span><span class="dtoj-prep-card-count">{{ lesson.count }} 道题</span></div>
+          <h2>{{ lesson.title }}</h2>
+        </header>
+        <div class="dtoj-prep-card-body">
+          <div class="dtoj-prep-time" aria-label="上课时间">
+            <div class="dtoj-prep-time-point"><span>开始</span><time>{{ lesson.start }}</time></div>
+            <div class="dtoj-prep-time-point"><span>结束</span><time>{{ lesson.end }}</time></div>
+          </div>
+          <section class="dtoj-prep-problems">
+            <div class="dtoj-prep-problems-head"><h3>本节题单</h3><span>预览 {{ lesson.preview.length }} 道</span></div>
+            <ol>{% for problem in lesson.preview %}<li><span class="dtoj-prep-problem-n">{{ loop.index }}.</span><a href="{{ url('problem_detail', pid=problem.pid) }}">{{ problem.title }}</a></li>{% endfor %}</ol>
+            {% if lesson.count > lesson.preview.length %}<p class="dtoj-prep-more">另有 {{ lesson.count - lesson.preview.length }} 道题</p>{% endif %}
+          </section>
+          <footer><a href="{{ url('dtoj_lesson_prep_edit', id=lesson.id) }}">查看与编辑<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></footer>
+        </div>
+      </article>
+      {% endfor %}
+      </div>{% else %}
+      <p class="dtoj-prep-group-empty">{% if invalidRange %}当前日期范围无效，未显示课时。{% elif from or to %}所选时间范围内没有备课安排。{% else %}这个小组还没有备课安排。{% endif %}</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  {% endif %}
+  </div>
+  </div>
+</div>
+{% endblock %}

@@ -4,6 +4,7 @@ import {
     DomainModel, ForbiddenError, Handler,
     HomeworkNotAttendedError, HomeworkNotLiveError, moment, NotAssignedError, ObjectId, OplogModel, param,
     PERM, PermissionError, ProblemModel, ProblemNotFoundError, PRIV, query, RecordModel, STATUS,
+    STATUS_SHORT_TEXTS,
     StorageModel, TrainingModel, Types, UserModel, ValidationError,
 } from 'hydrooj';
 import {
@@ -282,6 +283,7 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
             classroomLessons.push(...activeDocs.map((lesson) => {
                 const training = lesson.trainingId ? trainingById.get(lesson.trainingId.toHexString()) : null;
                 return {
+                    id: lesson._id,
                     title: lesson.title,
                     group: lesson.group,
                     start: moment(lesson.startAt).tz(tz).format('YYYY-MM-DD HH:mm'),
@@ -521,6 +523,78 @@ class DtojHomeworkMainHandler extends DtojPageHandler {
             hwSelfOnly: !canViewAll && loggedIn,
         };
         this.response.template = 'homework_main.html';
+    }
+}
+
+/** 学生查看已开放课时的个人练习进度；仅返回当前登录者自己的题目状态。 */
+class DtojClassroomLessonHandler extends DtojPageHandler {
+    @param('id', Types.ObjectId)
+    async get(domainId: string, id: ObjectId) {
+        const lesson = await db.collection(LESSON_COLL).findOne({ _id: id, domainId });
+        if (!lesson || lesson.startAt > new Date()) throw new NotAssignedError('classroom practice', id);
+
+        const groups = await myHomeworkGroups(domainId, this.user._id);
+        if (!groups.includes(lesson.group)) throw new NotAssignedError('classroom practice', id);
+
+        const pids = [...new Set(lesson.pids || [])];
+        const pdict = pids.length ? await ProblemModel.getList(
+            domainId, pids,
+            this.user.hasPerm(PERM.PERM_VIEW_PROBLEM_HIDDEN) || this.user._id,
+            false,
+        ) : {};
+        const visiblePids = pids.filter((pid) => pdict[pid]?.pid);
+        const statusDict = visiblePids.length
+            ? await ProblemModel.getListStatus(domainId, this.user._id, visiblePids)
+            : {};
+        const recordIds = [...new Map(Object.values(statusDict)
+            .filter((status) => status.rid instanceof ObjectId)
+            .map((status) => [status.rid.toHexString(), status.rid])).values()];
+        const recordRows = recordIds.length ? await RecordModel.getMulti(domainId, {
+            uid: this.user._id,
+            pid: { $in: visiblePids },
+            _id: { $in: recordIds },
+        }).project<{ _id: ObjectId, status: number }>({ _id: 1, status: 1 }).toArray() : [];
+        const recordDict = Object.fromEntries(recordRows.map((record) => [record._id.toHexString(), record]));
+
+        const problems = pids.map((pid) => {
+            const pdoc = pdict[pid];
+            const status = pdoc?.pid ? statusDict[pid] : null;
+            const record = status?.rid ? recordDict[status.rid.toHexString()] : null;
+            const statusCode = record?.status ?? status?.status;
+            const statusKey = statusCode as STATUS;
+            const isAccepted = statusKey === STATUS.STATUS_ACCEPTED;
+            const isPending = [
+                STATUS.STATUS_WAITING, STATUS.STATUS_FETCHED,
+                STATUS.STATUS_COMPILING, STATUS.STATUS_JUDGING,
+            ].includes(statusKey);
+            return {
+                pid,
+                title: pdoc?.pid ? pdoc.title : '题目当前不可见',
+                url: pdoc?.pid ? this.url('problem_detail', { pid: pdoc.pid || pid }) : '',
+                statusText: !status ? '未提交'
+                    : isAccepted ? '已通过'
+                        : isPending ? '评测中' : `最近状态 ${STATUS_SHORT_TEXTS[statusKey] || '已提交'}`,
+                state: !status ? 'todo' : isAccepted ? 'accepted' : isPending ? 'pending' : 'attempted',
+                rid: record?._id,
+            };
+        });
+        const acceptedCount = problems.filter((problem) => problem.state === 'accepted').length;
+        const attemptedCount = problems.filter((problem) => problem.state !== 'todo').length;
+        const tz = this.user.timeZone || 'Asia/Shanghai';
+
+        this.response.template = 'classroom_lesson_detail.html';
+        this.response.body = {
+            title: lesson.title,
+            group: lesson.group,
+            start: moment(lesson.startAt).tz(tz).format('YYYY-MM-DD HH:mm'),
+            end: moment(lesson.endAt).tz(tz).format('YYYY-MM-DD HH:mm'),
+            problems,
+            acceptedCount,
+            attemptedCount,
+            total: problems.length,
+            progress: problems.length ? Math.round(acceptedCount * 100 / problems.length) : 0,
+            trainingId: lesson.trainingId,
+        };
     }
 }
 
@@ -1440,6 +1514,9 @@ export async function apply(ctx: Context) {
     ctx.i18n.load('zh', { dtoj_lesson_prep: '备课' });
     ctx.i18n.load('zh_TW', { dtoj_lesson_prep: '備課' });
     ctx.i18n.load('en', { dtoj_lesson_prep: 'Lesson prep' });
+    ctx.i18n.load('zh', { dtoj_classroom_lesson: '课堂练习' });
+    ctx.i18n.load('zh_TW', { dtoj_classroom_lesson: '課堂練習' });
+    ctx.i18n.load('en', { dtoj_classroom_lesson: 'Classroom practice' });
     ctx.i18n.load('zh', { 'Student note': '学生备注', 'Search UID, username, or note': '搜索 UID、用户名或备注' });
     ctx.i18n.load('zh_TW', { 'Student note': '學生備註', 'Search UID, username, or note': '搜尋 UID、使用者名稱或備註' });
     ctx.i18n.load('en', { 'Student note': 'Student note', 'Search UID, username, or note': 'Search UID, username, or note' });
@@ -1470,6 +1547,7 @@ export async function apply(ctx: Context) {
     // 作业列表按「只看自己的作业」重写过滤条件，见 DtojHomeworkMainHandler
     ctx.Route('homework_main', '/homework', DtojHomeworkMainHandler, PERM.PERM_VIEW_HOMEWORK);
     dropEarlierRoutes(ctx, ['/homework']);
+    ctx.Route('dtoj_classroom_lesson', '/homework/classroom/:id', DtojClassroomLessonHandler, PRIV.PRIV_USER_PROFILE);
 
     // 撤销认领。core 没有这个接口，见 DtojHomeworkUnclaimHandler
     ctx.Route('homework_unclaim', '/homework/:tid/unclaim', DtojHomeworkUnclaimHandler, PERM.PERM_ATTEND_HOMEWORK);

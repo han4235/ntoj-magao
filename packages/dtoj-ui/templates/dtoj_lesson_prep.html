@@ -13,13 +13,25 @@
   .dtoj-prep-head p { max-width: 42rem; margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
   .dtoj-prep-filter {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 10px;
     margin-top: 20px;
   }
+  .dtoj-prep-teacher-row { display: flex; align-items: center; gap: 16px; }
+  .dtoj-prep-teacher-label { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 36px; margin: 0; color: var(--ink); font-size: 14px; line-height: 1; }
+  .dtoj-prep-teacher-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip { box-sizing: border-box; position: relative; display: inline-flex; flex-direction: row; align-items: center; justify-content: center; height: 36px; min-height: 36px; max-width: 100%; margin: 0; padding: 0 14px; border: 1px solid #dfe7f2; border-radius: 999px; background: rgba(255,255,255,.92); color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color .16s ease, color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip:hover { border-color: #c8d5e8; background: #f5f8fc; }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip:active { transform: translateY(1px); }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip:has(input:checked) { border-color: var(--brand); background: var(--brand); color: #fff; font-weight: 600; box-shadow: 0 4px 10px rgba(37, 99, 235, .16); }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip:has(input:checked):hover { border-color: var(--brand-deep); background: var(--brand-deep); }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip:has(input:focus-visible) { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 2px; }
+  .dtoj-prep-filter .dtoj-prep-teacher-chip > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1; }
+  .dtoj-prep-filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .dtoj-prep-range { display: flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; }
-  .dtoj-prep-filter input {
+  .dtoj-prep-filter input[type="date"] {
     box-sizing: border-box;
     flex: 0 1 176px;
     width: 176px;
@@ -193,9 +205,13 @@
     .dtoj-prep-head { align-items: stretch; flex-direction: column; gap: 16px; }
     .dtoj-prep-head p { margin-top: 8px; }
     .dtoj-prep-head a.dtoj-prep-action { align-self: flex-start; }
-    .dtoj-prep-filter { align-items: flex-start; flex-direction: column; gap: 10px; }
+    .dtoj-prep-filter { align-items: stretch; }
+    .dtoj-prep-teacher-row { gap: 12px; }
+    .dtoj-prep-teacher-options { gap: 7px; }
+    .dtoj-prep-filter .dtoj-prep-teacher-chip { padding: 0 12px; }
+    .dtoj-prep-filter-controls { width: 100%; }
     .dtoj-prep-range { width: 100%; }
-    .dtoj-prep-filter input { flex: 1 1 0; width: 0; }
+    .dtoj-prep-filter input[type="date"] { flex: 1 1 0; width: 0; }
     .dtoj-prep-empty { min-height: 240px; }
   }
 </style>
@@ -206,53 +222,112 @@
     <div><h1>备课</h1><p>为一个班级安排一节课的时间和题单。课时开始后会自动向所属小组开放为课堂练习，结束后自动收起。</p></div>
     {% if groups.length %}<a class="dtoj-prep-action" href="{{ url('dtoj_lesson_prep_new') }}">新建课时</a>{% endif %}
   </header>
-  {% if not groups.length %}
+  {% if not hasGroups %}
     <div class="dtoj-prep-empty">
       <span class="dtoj-prep-empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5h6.5a3 3 0 0 1 3 3v11a3 3 0 0 0-3-3H4zM20 5.5h-3.5a3 3 0 0 0-3 3v11a3 3 0 0 1 3-3H20z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
       <h2>先准备一个班级</h2><p>创建或加入你负责的小组后，就可以为班级安排课时和题单。</p><a class="dtoj-prep-action" href="{{ url('dtoj_group') }}">管理小组</a>
     </div>
   {% else %}
     <form class="dtoj-prep-filter" method="get" action="{{ url('dtoj_lesson_prep') }}">
-      <div class="dtoj-prep-range" role="group" aria-label="备课日期范围">
-        <input type="date" name="from" value="{{ from }}" aria-label="开始日期">
-        <span class="dtoj-prep-range-sep" aria-hidden="true">—</span>
-        <input type="date" name="to" value="{{ to }}" aria-label="结束日期">
+      {% if isAdmin %}
+      <div class="dtoj-prep-teacher-row">
+        <span class="dtoj-prep-teacher-label">教师</span>
+        <div class="dtoj-prep-teacher-options" role="group" aria-label="按教师筛选">
+          <label class="dtoj-prep-teacher-chip">
+            <input type="radio" name="teacher" value=""{% if not teacher %} checked{% endif %}>
+            <span>全部</span>
+          </label>
+          {% for option in teacherOptions %}
+          <label class="dtoj-prep-teacher-chip">
+            <input type="radio" name="teacher" value="{{ option.uid }}"{% if teacher == option.uid %} checked{% endif %}>
+            <span>{{ option.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
       </div>
-      <button type="submit">筛选</button>
+      {% endif %}
+      <div class="dtoj-prep-filter-controls">
+        <div class="dtoj-prep-range" role="group" aria-label="备课日期范围">
+          <input type="date" name="from" value="{{ from }}" aria-label="开始日期">
+          <span class="dtoj-prep-range-sep" aria-hidden="true">—</span>
+          <input type="date" name="to" value="{{ to }}" aria-label="结束日期">
+        </div>
+        <button type="submit">筛选</button>
+      </div>
     </form>
     {% if invalidRange %}<p class="dtoj-prep-filter-error" role="alert">日期范围无效，请检查日期格式，并确保开始日期不晚于结束日期。</p>{% endif %}
-    {% for group in groups %}
-    <section class="dtoj-prep-group-section" aria-labelledby="dtoj-prep-group-{{ loop.index }}">
-      <header class="dtoj-prep-group-heading"><h2 id="dtoj-prep-group-{{ loop.index }}">{{ group.name }}</h2><span>{{ group.lessons.length }} 节备课</span></header>
-      {% if group.lessons.length %}<div class="dtoj-prep-grid">
-      {% for lesson in group.lessons %}
-      <article class="dtoj-prep-card">
-        <header class="dtoj-prep-card-head">
-          <svg class="dtoj-prep-lines" viewBox="0 0 320 180" aria-hidden="true"><path d="M-10 40c70 36 120 8 190-28s90-20 150 8"/><path d="M40 -20c30 70 20 110-10 170"/><path d="M210 8c48 42 70 30 120-16"/><path d="M250 50c36 48 28 90 8 140"/></svg>
-          <div class="dtoj-prep-card-kicker"><span class="dtoj-prep-group">{{ lesson.group }}</span><span class="dtoj-prep-card-count">{{ lesson.count }} 道题</span></div>
-          <h2>{{ lesson.title }}</h2>
-        </header>
-        <div class="dtoj-prep-card-body">
-          <div class="dtoj-prep-time" aria-label="上课时间">
-            <div class="dtoj-prep-time-point"><span>开始</span><time>{{ lesson.start }}</time></div>
-            <div class="dtoj-prep-time-point"><span>结束</span><time>{{ lesson.end }}</time></div>
+    {% if not groups.length %}
+      <p class="dtoj-prep-group-empty">当前筛选的老师还没有负责的小组或备课安排。</p>
+    {% else %}
+      {% for group in groups %}
+      <section class="dtoj-prep-group-section" aria-labelledby="dtoj-prep-group-{{ loop.index }}">
+        <header class="dtoj-prep-group-heading"><h2 id="dtoj-prep-group-{{ loop.index }}">{{ group.name }}</h2><span>{{ group.lessons.length }} 节备课</span></header>
+        {% if group.lessons.length %}<div class="dtoj-prep-grid">
+        {% for lesson in group.lessons %}
+        <article class="dtoj-prep-card">
+          <header class="dtoj-prep-card-head">
+            <svg class="dtoj-prep-lines" viewBox="0 0 320 180" aria-hidden="true"><path d="M-10 40c70 36 120 8 190-28s90-20 150 8"/><path d="M40 -20c30 70 20 110-10 170"/><path d="M210 8c48 42 70 30 120-16"/><path d="M250 50c36 48 28 90 8 140"/></svg>
+            <div class="dtoj-prep-card-kicker"><span class="dtoj-prep-group">{{ lesson.group }}</span><span class="dtoj-prep-card-count">{{ lesson.count }} 道题</span></div>
+            <h2>{{ lesson.title }}</h2>
+          </header>
+          <div class="dtoj-prep-card-body">
+            <div class="dtoj-prep-time" aria-label="上课时间">
+              <div class="dtoj-prep-time-point"><span>开始</span><time>{{ lesson.start }}</time></div>
+              <div class="dtoj-prep-time-point"><span>结束</span><time>{{ lesson.end }}</time></div>
+            </div>
+            <section class="dtoj-prep-problems">
+              <div class="dtoj-prep-problems-head"><h3>本节题单</h3><span>预览 {{ lesson.preview.length }} 道</span></div>
+              <ol>{% for problem in lesson.preview %}<li><span class="dtoj-prep-problem-n">{{ loop.index }}.</span><a href="{{ url('problem_detail', pid=problem.pid) }}">{{ problem.title }}</a></li>{% endfor %}</ol>
+              {% if lesson.count > lesson.preview.length %}<p class="dtoj-prep-more">另有 {{ lesson.count - lesson.preview.length }} 道题</p>{% endif %}
+            </section>
+            <footer><a href="{{ url('dtoj_lesson_prep_edit', id=lesson.id) }}">查看与编辑<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></footer>
           </div>
-          <section class="dtoj-prep-problems">
-            <div class="dtoj-prep-problems-head"><h3>本节题单</h3><span>预览 {{ lesson.preview.length }} 道</span></div>
-            <ol>{% for problem in lesson.preview %}<li><span class="dtoj-prep-problem-n">{{ loop.index }}.</span><a href="{{ url('problem_detail', pid=problem.pid) }}">{{ problem.title }}</a></li>{% endfor %}</ol>
-            {% if lesson.count > lesson.preview.length %}<p class="dtoj-prep-more">另有 {{ lesson.count - lesson.preview.length }} 道题</p>{% endif %}
-          </section>
-          <footer><a href="{{ url('dtoj_lesson_prep_edit', id=lesson.id) }}">查看与编辑<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a></footer>
-        </div>
-      </article>
+        </article>
+        {% endfor %}
+        </div>{% else %}
+        <p class="dtoj-prep-group-empty">{% if invalidRange %}当前日期范围无效，未显示课时。{% elif from or to %}所选时间范围内没有备课安排。{% else %}这个小组还没有备课安排。{% endif %}</p>
+        {% endif %}
+      </section>
       {% endfor %}
-      </div>{% else %}
-      <p class="dtoj-prep-group-empty">{% if invalidRange %}当前日期范围无效，未显示课时。{% elif from or to %}所选时间范围内没有备课安排。{% else %}这个小组还没有备课安排。{% endif %}</p>
-      {% endif %}
-    </section>
-    {% endfor %}
+    {% endif %}
   {% endif %}
   </div>
   </div>
 </div>
+<script>
+(() => {
+  const form = document.querySelector('.dtoj-prep-filter');
+  const options = form?.querySelector('.dtoj-prep-teacher-options');
+  if (!form || !options) return;
+
+  const inputs = [...options.querySelectorAll('input[name="teacher"]')];
+  const allInput = inputs.find((input) => input.value === '');
+  if (!allInput) return;
+
+  let selectedInput = inputs.find((input) => input.checked) || allInput;
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const chip = target.closest('.dtoj-prep-teacher-chip');
+    const input = chip?.querySelector('input[name="teacher"]');
+    if (!input) return;
+
+    if (input === selectedInput) {
+      event.preventDefault();
+      setTimeout(() => {
+        allInput.checked = true;
+        selectedInput = allInput;
+      }, 0);
+      return;
+    }
+
+    selectedInput = input;
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (inputs.includes(input) && input.checked) selectedInput = input;
+  }, true);
+})();
+</script>
 {% endblock %}

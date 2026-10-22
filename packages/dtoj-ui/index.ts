@@ -1159,23 +1159,52 @@ async function lessonEditDoc(domainId: string, handler: Handler, id: ObjectId) {
 class DtojLessonPrepHandler extends DtojDataHandler {
     @query('from', Types.String, true)
     @query('to', Types.String, true)
-    async get({ domainId }: { domainId: string }, from = '', to = '') {
+    @query('teacher', Types.PositiveInt, true)
+    async get({ domainId }: { domainId: string }, from = '', to = '', teacherPick?: number) {
         const groups = await lessonGroups(domainId, this);
+        const isAdmin = managesAllGroups(this.user);
+        const adminUids = isAdmin ? await groupAdminUids(domainId) : new Set<number>();
+        let teacherOptions: { uid: number, name: string }[] = [];
+        if (isAdmin) {
+            const candidates = new Set<number>(adminUids);
+            const members = await DomainModel.getMultiUserInDomain(domainId, { join: true })
+                .project<{ uid: number }>({ uid: 1 })
+                .toArray();
+            for (const member of members) candidates.add(member.uid);
+            for (const group of groups) {
+                if (typeof group.owner === 'number') candidates.add(group.owner);
+                for (const uid of group.maintainers || []) candidates.add(uid);
+            }
+            const users = candidates.size ? await UserModel.getList(domainId, [...candidates]) : {};
+            teacherOptions = [...candidates]
+                .filter((uid) => !HIDDEN_DOMAIN_USER_IDS.has(uid))
+                .filter((uid) => users[uid]?.hasPerm(
+                    PERM.PERM_MANAGE_GROUP_ALL, PERM.PERM_MANAGE_GROUP,
+                    PERM.PERM_CREATE_HOMEWORK, PERM.PERM_EDIT_PROBLEM,
+                ))
+                .map((uid) => ({ uid, name: users[uid].displayName || users[uid].uname || `#${uid}` }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+        }
+        const teacher = isAdmin && teacherOptions.some((item) => item.uid === teacherPick) ? teacherPick : null;
+        const visibleGroups = teacher
+            ? groups.filter((group) => groupOwnerUids(group, adminUids).has(teacher))
+            : groups;
         const fromDate = from ? lessonDate(from) : null;
         const toDate = to ? lessonDate(to) : null;
         const invalidRange = (!!from && !fromDate) || (!!to && !toDate)
             || (!!fromDate && !!toDate && fromDate > toDate);
         const filter: Record<string, any> = {
             domainId,
-            group: { $in: groups.map((group) => group.name) },
+            group: { $in: visibleGroups.map((group) => group.name) },
         };
-        if (!managesAllGroups(this.user)) filter.owner = this.user._id;
+        if (teacher) filter.owner = teacher;
+        else if (!isAdmin) filter.owner = this.user._id;
         if (fromDate || toDate) {
             filter.startAt = {};
             if (fromDate) filter.startAt.$gte = fromDate;
             if (toDate) filter.startAt.$lt = new Date(toDate.getTime() + 24 * 60 * 60 * 1000);
         }
-        const docs = groups.length && !invalidRange
+        const docs = visibleGroups.length && !invalidRange
             ? await db.collection(LESSON_COLL).find(filter).sort({ startAt: 1 }).limit(200).toArray()
             : [];
         const pids = [...new Set(docs.flatMap((doc) => doc.pids))];
@@ -1186,13 +1215,13 @@ class DtojLessonPrepHandler extends DtojDataHandler {
             end: lessonTimeText(doc.endAt).replace('T', ' '), count: doc.pids.length,
             preview: doc.pids.slice(0, 3).map((pid) => ({ pid, title: pdict[pid]?.title || `题目 #${pid}` })),
         }));
-        const groupSections = groups.map((group) => ({
+        const groupSections = visibleGroups.map((group) => ({
             name: group.name,
             lessons: lessons.filter((lesson) => lesson.group === group.name),
         }));
         this.view('dtoj_lesson_prep', {
             groups: groupSections,
-            from, to, invalidRange,
+            from, to, invalidRange, isAdmin, teacher, teacherOptions, hasGroups: groups.length > 0,
         });
     }
 }

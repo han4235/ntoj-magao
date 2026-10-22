@@ -18,6 +18,8 @@ services:
       context: ../..
       dockerfile: install/docker/backend/Dockerfile
     container_name: oj-backend
+    environment:
+      PPT_USER_SYNC_TOKEN: ${PPT_USER_SYNC_TOKEN:-}
     restart: always
     depends_on:
       oj-mongo:

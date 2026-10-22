@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import { escapeRegExp } from 'lodash';
 import {
     canViewAllDomainRecords, ContestModel, ContestNotFoundError, Context, CreateError as Err, db, DocumentModel,
@@ -1080,12 +1082,23 @@ class DtojOjSessionHandler extends Handler {
     noCheckPermView = true;
     notUsage = true;
 
-    async get() {
+    async get({ domainId }: { domainId: string }) {
         // 身份相关的响应绝不能被缓存，否则会把甲的身份回给乙
         this.response.addHeader('Cache-Control', 'no-store');
         this.response.type = 'application/json';
 
         if (!this.user.hasPriv(PRIV.PRIV_USER_PROFILE)) {
+            this.response.status = 401;
+            this.response.body = { ok: false };
+            return;
+        }
+
+        // Hydro 登录票据可能在退域后仍短暂有效；PPT 不应再凭旧 sid 重新激活该账号。
+        const isDomainMember = await DomainModel.getMultiUserInDomain(domainId, {
+            uid: this.user._id,
+            join: true,
+        }).limit(1).hasNext();
+        if (!isDomainMember) {
             this.response.status = 401;
             this.response.body = { ok: false };
             return;
@@ -1104,6 +1117,52 @@ class DtojOjSessionHandler extends Handler {
             uname: this.user.uname,
             displayName: this.user.displayName || this.user.uname,
             role: isAdmin ? 'ADMIN' : (isTeacher ? 'TEACHER' : 'USER'),
+        };
+    }
+}
+
+/** Hydro → PPT 的服务端名册接口。只返回当前域正常账号的最小身份字段。 */
+class DtojPptUserRosterHandler extends Handler {
+    noCheckPermView = true;
+    notUsage = true;
+
+    async get({ domainId }: { domainId: string }) {
+        this.response.addHeader('Cache-Control', 'no-store');
+        this.response.type = 'application/json';
+
+        const expected = process.env.PPT_USER_SYNC_TOKEN || '';
+        if (!expected) {
+            this.response.status = 503;
+            this.response.body = { ok: false };
+            return;
+        }
+        // 使用专用头，避免 Authorization: Bearer 被 Hydro 通用中间件当成登录 sid。
+        const provided = String(this.request.headers['x-ppt-user-sync-token'] || '');
+        const expectedBytes = Buffer.from(expected);
+        const providedBytes = Buffer.from(provided);
+        if (expectedBytes.length !== providedBytes.length || !timingSafeEqual(expectedBytes, providedBytes)) {
+            this.response.status = 401;
+            this.response.body = { ok: false };
+            return;
+        }
+
+        const members = await DomainModel.getMultiUserInDomain(domainId, { join: true })
+            .project<{ uid: number }>({ uid: 1 })
+            .toArray();
+        const users = await UserModel.getList(domainId, members.map((member) => member.uid));
+        this.response.body = {
+            ok: true,
+            users: Object.values(users)
+                .filter((user) => user.hasPriv(PRIV.PRIV_USER_PROFILE) && !HIDDEN_DOMAIN_USER_IDS.has(user._id))
+                .map((user) => ({
+                    uid: user._id,
+                    uname: user.uname,
+                    displayName: user.displayName || user.uname,
+                    role: user.hasPerm(PERM.PERM_EDIT_DOMAIN)
+                        ? 'ADMIN'
+                        : (user.hasPerm(PERM.PERM_EDIT_PROBLEM) ? 'TEACHER' : 'USER'),
+                }))
+                .sort((a, b) => a.uid - b.uid),
         };
     }
 }
@@ -1535,6 +1594,8 @@ export async function apply(ctx: Context) {
 
     // 课件系统据此确认来访者身份，见 DtojOjSessionHandler
     ctx.Route('dtoj_oj_session', '/oj-session', DtojOjSessionHandler);
+    // PPT 服务端定时拉取本域名册；使用独立共享令牌，不依赖某个用户的 sid。
+    ctx.Route('dtoj_ppt_user_roster', '/ppt-user-roster', DtojPptUserRosterHandler);
 
     // 顶栏未读角标切回前台时的对账接口，见 DtojUnreadHandler
     ctx.Route('dtoj_unread', '/dtoj/unread', DtojUnreadHandler, PRIV.PRIV_USER_PROFILE);

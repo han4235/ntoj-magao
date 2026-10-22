@@ -1,0 +1,100 @@
+{% set page_name = 'dtoj_classroom_lesson' %}
+{% extends "layout/basic.html" %}
+{% block content %}
+{% include "dtoj_style.html" %}
+<style>
+  .dtoj-classroom-detail { gap: 22px; }
+  .dtoj-classroom-back { margin: 0 0 8px; }
+  .dtoj-classroom-back a { color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none; }
+  .dtoj-classroom-back a:hover { color: var(--brand-deep); }
+  .dtoj-classroom-hero,
+  .dtoj-classroom-progress-card { overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.96); box-shadow: 0 12px 32px rgba(28,39,64,.07); }
+  .dtoj-classroom-hero { display: grid; grid-template-columns: minmax(0,1fr) minmax(220px, .6fr); gap: 20px; padding: 24px; }
+  .dtoj-classroom-hero-main { min-width: 0; }
+  .dtoj-classroom-eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .dtoj-classroom-group { display: inline-flex; align-items: center; min-height: 28px; padding: 0 11px; border-radius: 999px; color: #1d4ed8; background: #eff6ff; font-size: 12px; font-weight: 800; }
+  .dtoj-classroom-kind { color: var(--muted); font-size: 12px; font-weight: 700; }
+  .dtoj-classroom-hero h1 { margin: 0; color: var(--ink); font: 800 clamp(24px, 3vw, 32px)/1.25 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif; letter-spacing: -.03em; overflow-wrap: anywhere; }
+  .dtoj-classroom-dates { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+  .dtoj-classroom-dates b { color: var(--ink-2); }
+  .dtoj-classroom-summary { align-self: center; padding: 16px; border-radius: 14px; background: #f4f7fb; }
+  .dtoj-classroom-summary-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; color: var(--muted); font-size: 12px; font-weight: 700; }
+  .dtoj-classroom-summary-top strong { color: var(--ink); font-size: 22px; font-weight: 850; font-variant-numeric: tabular-nums; }
+  .dtoj-classroom-track { height: 8px; overflow: hidden; margin: 10px 0; border-radius: 99px; background: #dfe7f2; }
+  .dtoj-classroom-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #14b8a6); }
+  .dtoj-classroom-summary-note { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+  .dtoj-classroom-progress-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+  .dtoj-classroom-progress-card-head h2 { margin: 0; color: var(--ink); font: 800 19px/1.4 "Source Han Serif SC", "Noto Serif SC", "Songti SC", serif; }
+  .dtoj-classroom-progress-card-head span { color: var(--muted); font-size: 12px; font-weight: 700; }
+  .dtoj-classroom-progress-note { margin: 0; padding: 12px 22px; color: var(--muted); background: #f8fafc; font-size: 12px; line-height: 1.7; }
+  .dtoj-classroom-problem-list { display: grid; margin: 0; padding: 0; list-style: none; }
+  .dtoj-classroom-problem-row { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 14px 22px; border-top: 1px solid #edf0f4; }
+  .dtoj-classroom-problem-row:first-child { border-top: 0; }
+  .dtoj-classroom-problem-index { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #1d4ed8; background: #eff6ff; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .dtoj-classroom-problem-name { min-width: 0; }
+  .dtoj-classroom-problem-name a,
+  .dtoj-classroom-problem-name span { display: block; overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+  .dtoj-classroom-problem-name a:hover { color: var(--brand-deep); text-decoration: underline; text-underline-offset: 3px; }
+  .dtoj-classroom-problem-name small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+  .dtoj-classroom-state { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; color: #64748b; background: #f1f5f9; font-size: 11px; font-weight: 800; white-space: nowrap; }
+  .dtoj-classroom-state.is-accepted { color: #166534; background: #e8f5ec; }
+  .dtoj-classroom-state.is-pending { color: #1d4ed8; background: #eaf1ff; }
+  .dtoj-classroom-state.is-attempted { color: #9a3412; background: #fff1e8; }
+  .dtoj-classroom-record { display: block; margin-top: 3px; color: var(--brand-deep); font-size: 11px; font-weight: 700; text-align: right; text-decoration: none; }
+  .dtoj-classroom-course-link { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); }
+  .dtoj-classroom-course-link a { color: var(--brand-deep); font-size: 13px; font-weight: 800; text-decoration: none; }
+  .dtoj-classroom-course-link a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .dtoj-classroom-empty { margin: 0; padding: 22px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 680px) {
+    .dtoj-classroom-hero { grid-template-columns: 1fr; padding: 18px; }
+    .dtoj-classroom-progress-card-head { padding: 16px; }
+    .dtoj-classroom-progress-note { padding: 10px 16px; }
+    .dtoj-classroom-problem-row { grid-template-columns: 34px minmax(0,1fr); gap: 10px; padding: 12px 16px; }
+    .dtoj-classroom-state-cell { grid-column: 2; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .dtoj-classroom-record { margin-top: 0; }
+    .dtoj-classroom-course-link { padding: 12px 16px; }
+  }
+</style>
+<div class="row">
+  <div class="medium-12 columns dtoj-page dtoj-home dtoj-classroom-detail">
+    <div class="dtoj-shell">
+      <p class="dtoj-classroom-back"><a href="{{ url('homework_main') }}">← 返回作业</a></p>
+      <section class="dtoj-classroom-hero" aria-labelledby="dtoj-classroom-title">
+        <div class="dtoj-classroom-hero-main">
+          <div class="dtoj-classroom-eyebrow"><span class="dtoj-classroom-group">{{ group }}</span><span class="dtoj-classroom-kind">课堂练习</span></div>
+          <h1 id="dtoj-classroom-title">{{ title }}</h1>
+          <p class="dtoj-classroom-dates"><span><b>开始</b> {{ start }}</span><span><b>结束</b> {{ end }}</span></p>
+        </div>
+        <div class="dtoj-classroom-summary" aria-label="个人练习进度">
+          <div class="dtoj-classroom-summary-top"><span>我的练习进度</span><strong>{{ acceptedCount }} / {{ total }}</strong></div>
+          <div class="dtoj-classroom-track" role="progressbar" aria-label="已通过题目比例" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ progress }}"><span style="width: {{ progress }}%"></span></div>
+          <div class="dtoj-classroom-summary-note"><span>已通过</span><span>{{ attemptedCount }} 题有提交</span></div>
+        </div>
+      </section>
+
+      <section class="dtoj-classroom-progress-card" aria-labelledby="dtoj-classroom-problems-title">
+        <header class="dtoj-classroom-progress-card-head"><h2 id="dtoj-classroom-problems-title">本节题单</h2><span>{{ total }} 道题</span></header>
+        <p class="dtoj-classroom-progress-note">以下状态按当前账号在这些题目上的已有记录汇总（包括课前记录），不代表小组其他同学的情况。</p>
+        {% if problems.length %}
+        <ol class="dtoj-classroom-problem-list">
+          {% for problem in problems %}
+          <li class="dtoj-classroom-problem-row">
+            <span class="dtoj-classroom-problem-index">{{ loop.index }}</span>
+            <div class="dtoj-classroom-problem-name">
+              {% if problem.url %}<a href="{{ problem.url }}">{{ problem.title }}</a>{% else %}<span>{{ problem.title }}</span>{% endif %}
+              <small>题目编号 {{ problem.pid }}</small>
+            </div>
+            <div class="dtoj-classroom-state-cell">
+              <span class="dtoj-classroom-state{% if problem.state == 'accepted' %} is-accepted{% elif problem.state == 'pending' %} is-pending{% elif problem.state == 'attempted' %} is-attempted{% endif %}">{{ problem.statusText }}</span>
+              {% if problem.rid %}<a class="dtoj-classroom-record" href="{{ url('record_detail', rid=problem.rid) }}">查看记录</a>{% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}<p class="dtoj-classroom-empty">老师还没有为这节课安排题目。</p>{% endif %}
+        {% if trainingId %}<footer class="dtoj-classroom-course-link"><span>本课题单来自训练课程</span><a href="{{ url('dtoj_training_detail', tid=trainingId) }}">继续训练课程 →</a></footer>{% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

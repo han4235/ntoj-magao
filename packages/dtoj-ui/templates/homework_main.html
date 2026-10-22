@@ -81,7 +81,7 @@
   .dtoj-classroom-problems li > a { text-decoration: none; text-underline-offset: 3px; }
   .dtoj-classroom-problems a:hover { text-decoration: underline; }
   .dtoj-classroom-problems a:focus-visible { outline: 2px solid var(--brand-deep); outline-offset: 3px; border-radius: 2px; }
-  .dtoj-classroom-course { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); color: #3e4c63; font-size: 12px; }
+  .dtoj-classroom-course { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); color: #3e4c63; font-size: 12px; }
   .dtoj-classroom-course a { display: inline-flex; align-items: center; gap: 3px; color: var(--brand-deep); font-size: 12px; font-weight: 700; text-decoration: none; }
   .dtoj-classroom-course a:hover { color: var(--brand); }
   .dtoj-classroom-course a:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
@@ -477,7 +477,10 @@
                 <div class="dtoj-classroom-problems-head"><h3>本节题单</h3><span>共 {{ lesson.problems.length }} 道</span></div>
                 <ol>{% for problem in lesson.problems %}<li><span class="dtoj-classroom-problem-n">{{ loop.index }}.</span>{% if problem.url %}<a href="{{ problem.url }}">{{ problem.title }}</a>{% else %}<span>{{ problem.title }}</span>{% endif %}</li>{% endfor %}</ol>
               </section>
-              <footer class="dtoj-classroom-course">{% if lesson.trainingId %}<a href="{{ url('dtoj_training_detail', tid=lesson.trainingId) }}" title="继续训练课程：{{ lesson.trainingTitle }}" aria-label="继续训练课程：{{ lesson.trainingTitle }}">继续训练课程 <span aria-hidden="true">→</span></a>{% else %}<span>课堂练习</span>{% endif %}</footer>
+              <footer class="dtoj-classroom-course">
+                <a href="{{ url('dtoj_classroom_lesson', id=lesson.id) }}">查看课堂练习 <span aria-hidden="true">→</span></a>
+                {% if lesson.trainingId %}<a href="{{ url('dtoj_training_detail', tid=lesson.trainingId) }}" title="继续训练课程：{{ lesson.trainingTitle }}" aria-label="继续训练课程：{{ lesson.trainingTitle }}">继续训练课程 <span aria-hidden="true">→</span></a>{% endif %}
+              </footer>
             </div>
           </li>
           {% endfor %}
